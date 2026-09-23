@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, Star, TabletSmartphone, Wifi, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, TabletSmartphone, Wifi, X } from 'lucide-react'
 import './App.css'
 
 const services = [
@@ -24,7 +24,7 @@ const faqs = [
   ['How does remote support work?', 'Start with the form below. We review what is happening, explain the next step, and schedule remote assistance when suitable.'],
   ['How much does support cost?', 'Choose a starting plan below or contact us for a tailored quote. Pricing is clear before work begins.'],
   ['Is my information secure?', 'We treat your details as confidential and only use them to respond to your support request.'],
-  ['How can I contact support?', 'Use the support form, call the number in the footer, or email hello@technovaassist.example.'],
+  ['How can I contact support?', 'Use the support form or call the number in the footer. Your request will be saved securely in our Neon database.'],
 ]
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6 } } }
@@ -148,13 +148,25 @@ function App() {
 
   const submitForm = async (event) => {
     event.preventDefault(); setFormState('loading'); setFormError('')
-    const form = new FormData(event.currentTarget)
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
+    const requestBody = JSON.stringify(Object.fromEntries(form.entries()))
     try {
-      const response = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(form.entries())) })
-      if (!response.ok) throw new Error('Unable to send request')
-      setFormState('success'); event.currentTarget.reset()
-    } catch {
-      setFormState('error'); setFormError('We could not send that just now. Please try again or email hello@technovaassist.example.')
+      let response
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          response = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody })
+          if (response.ok || attempt === 2) break
+        } catch (error) {
+          if (attempt === 2) throw error
+        }
+        await new Promise((resolve) => setTimeout(resolve, 800))
+      }
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.contact?._id) throw new Error(result.message || 'Unable to save request')
+      setFormState('success'); formElement.reset()
+    } catch (error) {
+      setFormState('error'); setFormError(error.message || 'We could not save your request right now. Please try submitting again.')
     }
   }
 
@@ -372,7 +384,6 @@ function App() {
           <div className="container">
             <div className="section-heading">
               <div><span className="eyebrow">Customer notes</span><h2>A better kind of <em>support.</em></h2></div>
-              <span className="demo-note"><Star size={15} /> Demo content</span>
             </div>
             <div className="testimonial-card">
               <div className="quote-mark">“</div>
@@ -442,11 +453,6 @@ function App() {
                 <label>Service required<select name="service" required defaultValue=""><option value="" disabled>Select a service</option>{services.map(([title]) => <option key={title}>{title}</option>)}</select></label>
               </div>
               <label>Describe your problem<textarea name="message" required minLength="10" maxLength="1000" placeholder="What’s happening? What have you tried so far?" /></label>
-              <fieldset>
-                <legend>Preferred contact method</legend>
-                <label className="radio-label"><input type="radio" name="contactPreference" value="Email" defaultChecked /> Email</label>
-                <label className="radio-label"><input type="radio" name="contactPreference" value="Phone" /> Phone</label>
-              </fieldset>
               {formState === 'success' ? <div className="success-message"><BadgeCheck size={18} /> Thank you! Your support request has been received.</div> : formState === 'error' ? <div className="error-message">{formError}</div> : null}
               <button className="button form-submit" type="submit" disabled={formState === 'loading'}>{formState === 'loading' ? 'Sending…' : 'Submit request'} <ArrowRight size={17} /></button>
             </form>
