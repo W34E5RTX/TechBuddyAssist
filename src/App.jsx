@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, Star, TabletSmartphone, Wifi, X } from 'lucide-react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import './App.css'
 
 const services = [
@@ -52,6 +53,7 @@ function App() {
   const actionButton = (label = 'Get Support') => <button className="button" onClick={() => scrollTo('contact')}>{label} <ArrowRight size={17} /></button>
 
   return <div className="site-shell">
+    <SpeedInsights />
     <div className="announcement"><span>New</span> Patient, professional technology support is one message away. <button onClick={() => scrollTo('contact')}>Get help today <ArrowRight size={14} /></button></div>
     <header className="nav-wrap"><nav className="nav container" aria-label="Main navigation"><button className="brand" onClick={() => scrollTo('home')}><span className="brand-mark"><Sparkles size={17} /></span>TechNova <b>Assist</b></button><button className="menu-toggle" aria-label="Toggle navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>{nav}</nav></header>
     <main>
