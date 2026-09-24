@@ -459,28 +459,6 @@ function App() {
           </div>
         </section>
 
-        <section id="payment" className="section pricing-section">
-          <div className="container">
-            <div className="center-heading">
-              <span className="eyebrow">Simple starting points</span>
-              <h2>Get technical <em>support.</em></h2>
-              <p>Choose a starting plan. Final scope and pricing are confirmed before work begins.</p>
-            </div>
-            <div className="pricing-grid">
-              {[['Quick support', '$49', 'A focused answer for a single question', 'One support conversation'], ['Remote assistance', '$99', 'Hands-on help for a supported device', 'Guided remote session', true], ['Premium support', '$199', 'A deeper support session for multiple needs', 'Priority support window']].map(([name, price, description, detail, featured]) => (
-                <div className={`price-card ${featured ? 'featured' : ''}`} key={name}>
-                  {featured && <span className="popular">Most requested</span>}
-                  <span>{name}</span>
-                  <strong>{price}</strong>
-                  <p>{description}</p>
-                  <small><Check size={14} /> {detail}</small>
-                  <button className={featured ? 'button' : 'outline-button'} onClick={() => scrollTo('contact')}>Choose plan <ArrowRight size={15} /></button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="final-cta">
           <div className="container">
             <span className="eyebrow light-eyebrow">One less thing to worry about</span>
