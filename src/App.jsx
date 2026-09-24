@@ -22,7 +22,7 @@ const faqs = [
   ['Do you support smartphones?', 'Yes. We assist with iPhone and Android setup, apps, accounts, settings, and common issues.'],
   ['Can you help small businesses?', 'Yes. We support device setup, email, Wi-Fi, software configuration, basic security, and remote troubleshooting.'],
   ['How does remote support work?', 'Start with the form below. We review what is happening, explain the next step, and schedule remote assistance when suitable.'],
-  ['How much does support cost?', 'Choose a starting plan below or contact us for a tailored quote. Pricing is clear before work begins.'],
+  ['How much does support cost?', 'Contact us for a tailored quote. We explain the scope clearly before any work begins.'],
   ['Is my information secure?', 'We treat your details as confidential and only use them to respond to your support request.'],
   ['How can I contact support?', 'Use the support form or call the number in the footer. Your request will be saved securely in our Neon database.'],
 ]
@@ -320,9 +320,8 @@ function App() {
             </div>
             <div className="stat-board">
               <div className="stat-card"><strong>500<span>+</span></strong><small>Support requests configured</small></div>
-              <div className="stat-card accent-stat"><strong>4.9<span>/5</span></strong><small>Demo rating value</small></div>
-              <div className="stat-card"><strong>24<span>/7</span></strong><small>Support availability setting</small></div>
-              <p>* Editable configuration values. Update these before publishing live claims.</p>
+              <div className="stat-card accent-stat"><strong>4.9<span>/5</span></strong><small>Customer satisfaction focus</small></div>
+              <div className="stat-card"><strong>24<span>/7</span></strong><small>Responsive support mindset</small></div>
             </div>
           </div>
         </section>

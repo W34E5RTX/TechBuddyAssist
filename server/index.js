@@ -7,8 +7,8 @@ import rateLimit from 'express-rate-limit'
 import mongoose from 'mongoose'
 import crypto from 'node:crypto'
 
-dotenv.config({ path: '.env.local' })
 dotenv.config()
+
 
 const app = express()
 const port = process.env.PORT || 5000
