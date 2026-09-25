@@ -43,7 +43,7 @@ function Nav({ menuOpen, setMenuOpen, scrollTo }) {
       <nav className="nav container" aria-label="Main navigation">
         <button className="brand" onClick={() => scrollTo('home')}>
           <span className="brand-mark"><Sparkles size={17} /></span>
-          TechBuddy <b>Assist</b>
+          Techbuddyassist
         </button>
         <button className="menu-toggle" aria-label="Toggle navigation" onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? <X /> : <Menu />}
@@ -107,7 +107,7 @@ function Footer({ scrollTo }) {
         <div>
           <button className="brand footer-brand" onClick={() => scrollTo('home')}>
             <span className="brand-mark"><Sparkles size={17} /></span>
-            TechBuddy <b>Assist</b>
+            Techbuddyassist
           </button>
           <p>Simple, reliable technology support for real life.</p>
           <address className="footer-contact">
@@ -121,7 +121,7 @@ function Footer({ scrollTo }) {
         <FooterLinkGroup title="Legal" links={legalLinks} />
       </div>
       <div className="container footer-bottom">
-        <span>© 2026 TechBuddy Assist.</span>
+        <span>© 2026 Techbuddyassist.</span>
         <span>US-based technology support provider.</span>
       </div>
     </footer>
@@ -181,7 +181,7 @@ function App() {
             <motion.div initial="hidden" animate="visible" variants={fadeUp} className="hero-copy">
               <div className="eyebrow"><span className="eyebrow-dot" /> Trusted technology support</div>
               <h1>Technology problems shouldn’t <em>slow you down.</em></h1>
-              <p className="hero-lede">TechBuddy Assist helps individuals, families, seniors, professionals, home offices, and small businesses understand, manage, and resolve technology problems with clear, patient, professional assistance. No jargon. No scare tactics. Just real help from real people who know technology.</p>
+              <p className="hero-lede">Techbuddyassist helps individuals, families, seniors, professionals, home offices, and small businesses understand, manage, and resolve technology problems with clear, patient, professional assistance. No jargon. No scare tactics. Just real help from real people who know technology.</p>
               <div className="hero-actions">
                 <ActionButton label="Get Support" onClick={() => scrollTo('contact')} />
                 <button className="text-button" onClick={() => scrollTo('services')}>Explore services <ArrowRight size={16} /></button>
@@ -309,7 +309,7 @@ function App() {
         <section className="section navy-section">
           <div className="container why-grid">
             <div>
-              <span className="eyebrow light-eyebrow">Why TechBuddy Assist</span>
+              <span className="eyebrow light-eyebrow">Why Techbuddyassist</span>
               <h2>Support built around <em>people.</em></h2>
               <p>Professional expertise matters. So does how it feels to ask for help. We bring both together in every conversation.</p>
               <div className="feature-list">
@@ -358,7 +358,7 @@ function App() {
             <div className="senior-quote">
               <div className="quote-mark">“</div>
               <p>Good support should leave you feeling more confident, not more confused.</p>
-              <span>TechBuddy Assist approach</span>
+              <span>Techbuddyassist approach</span>
             </div>
           </div>
         </section>

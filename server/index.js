@@ -50,5 +50,5 @@ app.use((req, res, next) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'))
 })
 
-const start = async () => { if (!process.env.MONGODB_URL) throw new Error('MONGODB_URL is required to start the API'); await mongoose.connect(process.env.MONGODB_URL, { serverSelectionTimeoutMS: 30000 }); app.listen(port, () => console.log(`TechBuddy Assist API listening on ${port}`)) }
+const start = async () => { if (!process.env.MONGODB_URL) throw new Error('MONGODB_URL is required to start the API'); await mongoose.connect(process.env.MONGODB_URL, { serverSelectionTimeoutMS: 30000 }); app.listen(port, () => console.log(`Techbuddyassist API listening on ${port}`)) }
 start()
