@@ -1,6 +1,7 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, TabletSmartphone, Wifi, X } from 'lucide-react'
+import { Analytics } from '@vercel/analytics/react'
 import './App.css'
 
 const services = [
@@ -279,7 +280,7 @@ function App() {
             </div>
             <div className="problem-panel">
               <div className="panel-label"><span className="status-dot" /> Common situations we help untangle</div>
-              {['Computer running slowly', 'Internet not working', 'Printer won’t print', 'Suspicious popups', 'Software not installing', 'Phone setup problems', 'Email or account trouble', 'Device configuration'].map((problem) => (
+              {['Computer running slowly', 'Internet not working', 'Printer won��t print', 'Suspicious popups', 'Software not installing', 'Phone setup problems', 'Email or account trouble', 'Device configuration'].map((problem) => (
                 <div className="problem-row" key={problem}><Check size={16} />{problem}<ArrowRight size={14} /></div>
               ))}
             </div>
@@ -467,6 +468,7 @@ function App() {
         </section>
       </main>
       <Footer scrollTo={scrollTo} />
+      <Analytics />
     </div>
   )
 }
