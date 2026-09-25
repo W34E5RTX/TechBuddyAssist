@@ -1,6 +1,7 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, TabletSmartphone, Wifi, X } from 'lucide-react'
+import { Analytics } from '@vercel/analytics/react'
 import './App.css'
 
 const services = [
@@ -467,6 +468,7 @@ function App() {
         </section>
       </main>
       <Footer scrollTo={scrollTo} />
+      <Analytics />
     </div>
   )
 }
