@@ -10,10 +10,6 @@ npm run dev
 
 This starts both the Vite frontend and the Express API. The frontend is available at `http://localhost:5173`.
 
-## Google Sheets submissions
-
-The contact form can also append each request to the configured Google Sheet. Create a Google Apps Script using `google-apps-script/Code.gs`, set the spreadsheet ID and a private token, then deploy it as a web app. Add the deployment URL as `GOOGLE_SHEETS_WEBHOOK_URL` and the same token as `GOOGLE_SHEETS_WEBHOOK_TOKEN` in Vercel.
-
 ## Production build
 
 ```bash

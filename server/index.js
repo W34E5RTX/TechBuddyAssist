@@ -26,16 +26,6 @@ const validContact = (body) => body.name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bo
 const contactSchema = new mongoose.Schema({ name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 }, email: { type: String, required: true, lowercase: true, trim: true }, phone: { type: String, required: true, trim: true }, service: { type: String, required: true, maxlength: 100 }, message: { type: String, required: true, maxlength: 1000 }, contactPreference: { type: String, enum: ['Email', 'Phone'], default: 'Email' }, status: { type: String, enum: ['New', 'In Progress', 'Resolved'], default: 'New' } }, { timestamps: true })
 const Contact = mongoose.model('Contact', contactSchema)
 const isDatabaseReady = () => mongoose.connection.readyState === 1
-const saveToGoogleSheet = async (record) => {
-  if (!process.env.GOOGLE_SHEETS_WEBHOOK_URL) return
-  const response = await fetch(process.env.GOOGLE_SHEETS_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: process.env.GOOGLE_SHEETS_WEBHOOK_TOKEN, record }),
-  })
-  const result = await response.json().catch(() => ({}))
-  if (!response.ok || result.ok !== true) throw new Error(result.message || `Google Sheets returned ${response.status}`)
-}
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, database: isDatabaseReady() ? 'connected' : 'unavailable' }))
 app.post('/api/contact', async (req, res) => {
@@ -43,7 +33,6 @@ app.post('/api/contact', async (req, res) => {
   if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable. Please try again.' })
   try {
     const record = await Contact.create(req.body)
-    await saveToGoogleSheet(record.toObject())
     res.status(201).json({ message: 'Support request received', contact: record })
   } catch (error) {
     res.status(500).json({ message: 'Unable to save support request data', error: error.message })
