@@ -162,7 +162,9 @@ function App() {
         }
         await new Promise((resolve) => setTimeout(resolve, 800))
       }
-      const result = await response.json().catch(() => ({}))
+      const contentType = response.headers.get('content-type') || ''
+      const result = contentType.includes('application/json') ? await response.json().catch(() => ({})) : {}
+      if (!contentType.includes('application/json')) throw new Error('The support API is not available on this deployment. Please redeploy the API and configure MONGODB_URL.')
       if (!response.ok || !result.contact?._id) throw new Error(result.message || 'The support API could not save your request. Check that the API is running and MongoDB is connected.')
       setFormState('success'); formElement.reset()
     } catch (error) {
