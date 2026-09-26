@@ -163,7 +163,7 @@ function App() {
         await new Promise((resolve) => setTimeout(resolve, 800))
       }
       const result = await response.json().catch(() => ({}))
-      if (!response.ok || !result.contact?._id) throw new Error(result.message || 'Unable to save request')
+      if (!response.ok || !result.contact?._id) throw new Error(result.message || 'The support API could not save your request. Check that the API is running and MongoDB is connected.')
       setFormState('success'); formElement.reset()
     } catch (error) {
       setFormState('error'); setFormError(error.message || 'We could not save your request right now. Please try submitting again.')
