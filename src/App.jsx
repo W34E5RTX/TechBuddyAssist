@@ -450,7 +450,7 @@ function App() {
                 <label>Email<input name="email" type="email" required placeholder="jane@example.com" /></label>
               </div>
               <div className="form-row">
-                <label>Phone<input name="phone" required pattern="[0-9+() .-]{7,}" placeholder="(555) 123-4567" /></label>
+                <label>Phone<input name="phone" required pattern="[0-9+() .\-]{7,}" placeholder="(555) 123-4567" /></label>
                 <label>Service required<select name="service" required defaultValue=""><option value="" disabled>Select a service</option>{services.map(([title]) => <option key={title}>{title}</option>)}</select></label>
               </div>
               <label>Describe your problem<textarea name="message" required minLength="10" maxLength="1000" placeholder="What’s happening? What have you tried so far?" /></label>
