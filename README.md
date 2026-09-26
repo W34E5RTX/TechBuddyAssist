@@ -1,4 +1,25 @@
-# React + Vite
+# Techbuddyassist
+
+## Local development
+
+Create a `.env` file with a reachable `MONGODB_URL`, then run:
+
+```bash
+npm run dev
+```
+
+This starts both the Vite frontend and the Express API. The frontend is available at `http://localhost:5173`.
+
+## Production build
+
+```bash
+npm run build
+npm start
+```
+
+The API serves the built frontend and listens on port `5000` by default.
+
+## React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
