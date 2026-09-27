@@ -29,6 +29,11 @@ const faqs = [
 ]
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6 } } }
+const defaultSupportPlans = [
+  { key: 'quick-support', category: 'QUICK SUPPORT', name: 'Quick support', description: 'A focused answer for a single question.', feature: 'One support conversation', amount: 4900 },
+  { key: 'remote-assistance', category: 'REMOTE ASSISTANCE', name: 'Remote assistance', description: 'Hands-on help for a supported device.', feature: 'Guided remote session', amount: 9900 },
+  { key: 'premium-support', category: 'PREMIUM SUPPORT', name: 'Premium support', description: 'A deeper support session for multiple needs.', feature: 'Priority support window', amount: 19900 },
+]
 
 function ActionButton({ label = 'Get Support', onClick, variant = 'primary' }) {
   return (
@@ -85,49 +90,51 @@ function FooterLinkGroup({ title, links }) {
   )
 }
 
-function BillingPage({ products, onCheckout, onOpenPortal, billingNotice }) {
-  const subscriptionProducts = products.filter((product) => product.type === 'subscription')
-  const oneTimeProduct = products.find((product) => product.type !== 'subscription')
-  const planLabels = ['Quick support', 'Remote assistance', 'Premium support']
-  const planFeatures = ['One support conversation', 'Guided remote session', 'Priority support window']
+function BillingPage() {
+  const [plans, setPlans] = useState(defaultSupportPlans)
+
+  useEffect(() => {
+    fetch('/api/support-plans')
+      .then((response) => response.json())
+      .then((data) => {
+        if (Array.isArray(data.plans) && data.plans.length) setPlans(data.plans)
+      })
+      .catch(() => undefined)
+  }, [])
 
   return (
     <section id="billing" className="section billing-section">
       <div className="container">
         <div className="section-heading billing-heading">
-          <span className="eyebrow">Simple starting points</span>
+          <span className="eyebrow">Support options</span>
           <h2>Choose your <em>support plan.</em></h2>
-          <p>Choose a starting plan. Final scope and pricing are confirmed before work begins.</p>
+          <p>Starting prices for common support needs. We’ll confirm the scope and final price with you before work begins.</p>
         </div>
-        {billingNotice && <div className="success-message" style={{ marginBottom: '20px' }}>{billingNotice}</div>}
         <div className="pricing-grid">
-          {subscriptionProducts.map((product, index) => {
+          {plans.map((plan, index) => {
             const isFeatured = index === 1
             return (
-            <article className={`pricing-card${isFeatured ? ' is-featured' : ''}`} key={product.key}>
+            <article className={`pricing-card${isFeatured ? ' is-featured' : ''}`} key={plan.key}>
               {isFeatured && <span className="pricing-popular">Most requested</span>}
-              <span className="pricing-tag">{planLabels[index] || 'Monthly support'}</span>
-              <h3>{product.name}</h3>
+              <span className="pricing-tag">{plan.category}</span>
+              <h3>{plan.name}</h3>
               <div className="price-line">
-                <strong>${(product.amount / 100).toFixed(2)}</strong>
-                <span>/ month</span>
+                <strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(plan.amount / 100)}</strong>
+                <span>starting at</span>
               </div>
-              <p>{product.description}</p>
-              <div className="pricing-feature"><Check size={17} /><span>{planFeatures[index] || 'Ongoing support'}</span></div>
-              <button className={`plan-button ${isFeatured ? 'button' : 'outline-button'}`} onClick={() => onCheckout(product.key)}>
-                Choose plan <ArrowRight size={17} />
-              </button>
+              <p>{plan.description}</p>
+              <div className="pricing-feature"><Check size={17} /><span>{plan.feature}</span></div>
+              <a className={`plan-button ${isFeatured ? 'button' : 'outline-button'}`} href="/#contact">
+                Request a quote <ArrowRight size={17} />
+              </a>
             </article>
             )
           })}
         </div>
-        {oneTimeProduct && (
-          <div className="one-time-plan">
-            <div><span className="eyebrow">Prefer a single session?</span><p>{oneTimeProduct.name} <strong>${(oneTimeProduct.amount / 100).toFixed(2)}</strong></p></div>
-            <button className="text-button" onClick={() => onCheckout(oneTimeProduct.key)}>Choose one-time support <ArrowRight size={16} /></button>
-          </div>
-        )}
-        <div className="billing-manage"><button className="text-button" onClick={onOpenPortal}>Manage billing <ArrowRight size={16} /></button></div>
+        <div className="quote-process">
+          <span className="eyebrow">More involved support?</span>
+          <p>Contact us for a tailored quote. After we agree on the work and final price, we’ll send a secure Stripe invoice.</p>
+        </div>
       </div>
     </section>
   )
@@ -192,69 +199,6 @@ function LandingPage() {
   const [activeTestimonial, setActiveTestimonial] = useState(0)
   const [formState, setFormState] = useState('idle')
   const [formError, setFormError] = useState('')
-  const [checkoutState, setCheckoutState] = useState('idle')
-  const [checkoutError, setCheckoutError] = useState('')
-  const [products, setProducts] = useState([
-    { key: 'support-session', name: 'Techbuddyassist Support Session', description: 'One-time guided troubleshooting and remote tech help.', amount: 14900, type: 'payment' },
-    { key: 'essential-plan', name: 'Essential Support Plan', description: 'Monthly tech support plan with priority response and ongoing guidance.', amount: 4900, type: 'subscription' },
-    { key: 'pro-plan', name: 'Pro Support Plan', description: 'Priority monthly support for homes, offices, and growing businesses.', amount: 9900, type: 'subscription' },
-    { key: 'business-plan', name: 'Business IT Support', description: 'Ongoing monthly IT support for device setup and business support.', amount: 14900, type: 'subscription' },
-  ])
-  const [billingNotice, setBillingNotice] = useState('')
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const status = params.get('checkout')
-    const productKey = params.get('product')
-    if (status === 'success') {
-      setBillingNotice(`Payment successful for ${productKey || 'your selected support plan'}.`)
-    }
-    if (status === 'cancelled') {
-      setBillingNotice('Checkout was cancelled. You can try another support plan at any time.')
-    }
-
-    fetch('/api/stripe/products')
-      .then((response) => response.json())
-      .then((data) => {
-        if (Array.isArray(data.products) && data.products.length) setProducts(data.products)
-      })
-      .catch(() => undefined)
-  }, [])
-
-  const startStripeCheckout = async (productKey = 'support-session') => {
-    setCheckoutState('loading')
-    setCheckoutError('')
-    try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productKey, email: 'support@techbuddyassist.com' }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.message || 'Unable to start the Stripe checkout session.')
-      if (data.url) window.location.href = data.url
-      else throw new Error('Stripe checkout did not return a redirect URL.')
-    } catch (error) {
-      setCheckoutState('error')
-      setCheckoutError(error.message || 'Something went wrong while starting checkout.')
-    }
-  }
-
-  const openBillingPortal = async () => {
-    try {
-      const response = await fetch('/api/stripe/customer-portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'support@techbuddyassist.com' }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.message || 'Unable to open the billing portal.')
-      if (data.url) window.location.href = data.url
-    } catch (error) {
-      setBillingNotice(error.message || 'Unable to open the billing portal.')
-    }
-  }
-
   const testimonials = [
     ['“The technician explained everything clearly and never made me feel silly for asking questions.”', 'Demo Customer', 'Home technology support'],
     ['“I finally understood what was happening with my Wi-Fi. The next steps were simple and calm.”', 'Demo Customer', 'Connectivity support'],
@@ -306,11 +250,10 @@ function LandingPage() {
               <p className="hero-lede">Techbuddyassist helps individuals, families, seniors, professionals, home offices, and small businesses understand, manage, and resolve technology problems with clear, patient, professional assistance. No jargon. No scare tactics. Just real help from real people who know technology.</p>
               <div className="hero-actions">
                 <ActionButton label="Get Support" onClick={() => scrollTo('contact')} />
-                <button className="button" onClick={() => navigate('/billing')} disabled={checkoutState === 'loading'}>
-                  {checkoutState === 'loading' ? 'Opening Stripe…' : 'View billing plans'} <ArrowRight size={17} />
+                <button className="outline-button" onClick={() => navigate('/billing')}>
+                  View support options <ArrowRight size={17} />
                 </button>
               </div>
-              {checkoutState === 'error' && <div className="error-message" style={{ marginTop: '16px' }}>{checkoutError}</div>}
               <div className="hero-note">
                 <div className="avatar-stack"><span>JM</span><span>RK</span><span>+</span></div>
                 <span><b>Real people. Clear answers.</b><br />Support that meets you where you are.</span>
@@ -524,7 +467,7 @@ function LandingPage() {
           </div>
         </section>
 
-        <BillingPage products={products} onCheckout={startStripeCheckout} onOpenPortal={openBillingPortal} billingNotice={billingNotice} />
+        <BillingPage />
 
         <section id="faq" className="section faq-section">
           <div className="container faq-grid">
@@ -627,65 +570,341 @@ function StripeStatusPage({ status }) {
 
 function BillingPageRoute() {
   const navigate = useNavigate()
-  const [products, setProducts] = useState([
-    { key: 'support-session', name: 'Techbuddyassist Support Session', description: 'One-time guided troubleshooting and remote tech help.', amount: 14900, type: 'payment' },
-    { key: 'essential-plan', name: 'Essential Support Plan', description: 'Monthly tech support plan with priority response and ongoing guidance.', amount: 4900, type: 'subscription' },
-    { key: 'pro-plan', name: 'Pro Support Plan', description: 'Priority monthly support for homes, offices, and growing businesses.', amount: 9900, type: 'subscription' },
-    { key: 'business-plan', name: 'Business IT Support', description: 'Ongoing monthly IT support for device setup and business support.', amount: 14900, type: 'subscription' },
-  ])
-  const [billingNotice, setBillingNotice] = useState('')
-
-  useEffect(() => {
-    fetch('/api/stripe/products')
-      .then((response) => response.json())
-      .then((data) => {
-        if (Array.isArray(data.products) && data.products.length) setProducts(data.products)
-      })
-      .catch(() => undefined)
-  }, [])
-
-  const startStripeCheckout = async (productKey = 'support-session') => {
-    try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productKey, email: 'support@techbuddyassist.com' }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.message || 'Unable to start the Stripe checkout session.')
-      if (data.url) window.location.href = data.url
-    } catch (error) {
-      setBillingNotice(error.message || 'Unable to start the Stripe checkout flow.')
-    }
-  }
-
-  const openBillingPortal = async () => {
-    try {
-      const response = await fetch('/api/stripe/customer-portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'support@techbuddyassist.com' }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.message || 'Unable to open the billing portal.')
-      if (data.url) window.location.href = data.url
-    } catch (error) {
-      setBillingNotice(error.message || 'Unable to open the billing portal.')
-    }
-  }
 
   return (
     <div className="site-shell">
-      <div className="announcement"><span>Billing</span> Choose a support plan or manage your Stripe account.</div>
+      <div className="announcement"><span>Quotes</span> We confirm scope and pricing before work begins.</div>
       <header className="nav-wrap">
         <nav className="nav container" aria-label="Billing navigation">
           <button className="brand" onClick={() => navigate('/')}>
             <span className="brand-wordmark"><span className="brand-tech">Tech</span><span className="brand-buddy">Buddy</span><span className="brand-assist">Assist</span></span>
           </button>
-          <button className="outline-button" onClick={() => navigate('/')}>Back home</button>
+          <div className="billing-nav-actions">
+            <Link to="/admin" className="text-button">Admin</Link>
+            <button className="outline-button" onClick={() => navigate('/')}>Back home</button>
+          </div>
         </nav>
       </header>
-      <BillingPage products={products} onCheckout={startStripeCheckout} onOpenPortal={openBillingPortal} billingNotice={billingNotice} />
+      <BillingPage />
+    </div>
+  )
+}
+
+function AdminPage() {
+  const [authenticated, setAuthenticated] = useState(false)
+  const [password, setPassword] = useState('')
+  const [plans, setPlans] = useState(defaultSupportPlans)
+  const [showNewPlan, setShowNewPlan] = useState(false)
+  const [newPlan, setNewPlan] = useState({ category: '', name: '', description: '', feature: '', price: '' })
+  const [requests, setRequests] = useState([])
+  const [customPayments, setCustomPayments] = useState([])
+  const [customPayment, setCustomPayment] = useState({ customerName: '', customerEmail: '', description: '', amount: '' })
+  const [generatedPayment, setGeneratedPayment] = useState(null)
+  const [copiedPaymentLink, setCopiedPaymentLink] = useState(false)
+  const [activeTab, setActiveTab] = useState('plans')
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const loadAdminData = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [plansResponse, requestsResponse, paymentsResponse] = await Promise.all([
+        fetch('/api/admin/support-plans', { credentials: 'same-origin' }),
+        fetch('/api/contact', { credentials: 'same-origin' }),
+        fetch('/api/admin/custom-payments', { credentials: 'same-origin' }),
+      ])
+      if (plansResponse.status === 401 || requestsResponse.status === 401 || paymentsResponse.status === 401) {
+        setAuthenticated(false)
+        return
+      }
+      const plansData = await plansResponse.json().catch(() => ({}))
+      const requestsData = await requestsResponse.json().catch(() => ({}))
+      const paymentsData = await paymentsResponse.json().catch(() => ({}))
+      if (!plansResponse.ok) throw new Error(plansData.message || 'Unable to load plans.')
+      if (!requestsResponse.ok) throw new Error(requestsData.message || 'Unable to load support requests.')
+      if (!paymentsResponse.ok) throw new Error(paymentsData.message || 'Unable to load custom payments.')
+      setPlans(plansData.plans || [])
+      setRequests(Array.isArray(requestsData) ? requestsData : [])
+      setCustomPayments(paymentsData.payments || [])
+      setAuthenticated(true)
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to load admin data.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetch('/api/admin/session', { credentials: 'same-origin' })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.message || 'Unable to check admin session.')
+        if (!data.configured) {
+          setError('Admin password is not configured. Set ADMIN_PASSWORD in the server environment.')
+        } else if (data.authenticated) {
+          return loadAdminData()
+        }
+      })
+      .catch((requestError) => setError(requestError.message || 'Unable to check admin session.'))
+  }, [])
+
+  const signIn = async (event) => {
+    event.preventDefault()
+    setError('')
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to sign in.')
+      setPassword('')
+      await loadAdminData()
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to sign in.')
+    }
+  }
+
+  const savePlan = async (plan) => {
+    setError('')
+    setNotice('')
+    try {
+      const response = await fetch(`/api/admin/support-plans/${encodeURIComponent(plan.key)}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...plan, amount: Math.round(Number(plan.amount)) }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to save plan.')
+      setPlans((currentPlans) => currentPlans.map((item) => item.key === plan.key ? data.plan : item))
+      setNotice(`${plan.name} saved.`)
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to save plan.')
+    }
+  }
+
+  const addPlan = async (event) => {
+    event.preventDefault()
+    setError('')
+    setNotice('')
+    try {
+      const response = await fetch('/api/admin/support-plans', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newPlan, amount: Math.round(Number(newPlan.price) * 100) }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to add plan.')
+      setPlans((currentPlans) => [...currentPlans, data.plan].sort((left, right) => left.sortOrder - right.sortOrder))
+      setNewPlan({ category: '', name: '', description: '', feature: '', price: '' })
+      setShowNewPlan(false)
+      setNotice(`${data.plan.name} added.`)
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to add plan.')
+    }
+  }
+
+  const setPlanActive = async (plan, isActive) => {
+    setError('')
+    setNotice('')
+    try {
+      const response = await fetch(`/api/admin/support-plans/${encodeURIComponent(plan.key)}/status`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to update plan status.')
+      setPlans((currentPlans) => currentPlans.map((item) => item.key === plan.key ? data.plan : item))
+      setNotice(`${plan.name} ${isActive ? 'restored' : 'archived'}.`)
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to update plan status.')
+    }
+  }
+
+  const createCustomPayment = async (event) => {
+    event.preventDefault()
+    setError('')
+    setNotice('')
+    setGeneratedPayment(null)
+    setCopiedPaymentLink(false)
+    try {
+      const response = await fetch('/api/admin/custom-payments', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...customPayment,
+          amount: Math.round(Number(customPayment.amount) * 100),
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to create payment link.')
+      setGeneratedPayment(data.payment)
+      setCustomPayments((current) => [data.payment, ...current])
+      setCustomPayment({ customerName: '', customerEmail: '', description: '', amount: '' })
+      setNotice('Payment link created. Send it to the customer to complete payment.')
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to create payment link.')
+    }
+  }
+
+  const copyPaymentLink = async () => {
+    if (!generatedPayment?.checkoutUrl) return
+    try {
+      await navigator.clipboard.writeText(generatedPayment.checkoutUrl)
+      setCopiedPaymentLink(true)
+    } catch {
+      setError('Clipboard access is unavailable. Use the Open checkout link instead.')
+    }
+  }
+
+  const updateRequestStatus = async (requestId, status) => {
+    setError('')
+    try {
+      const response = await fetch(`/api/contact/${requestId}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to update request.')
+      setRequests((currentRequests) => currentRequests.map((request) => request._id === requestId ? data : request))
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to update request.')
+    }
+  }
+
+  const signOut = async () => {
+    await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined)
+    setAuthenticated(false)
+    setRequests([])
+  }
+
+  return (
+    <div className="site-shell admin-shell">
+      <div className="announcement"><span>Admin</span> Techbuddyassist management</div>
+      <main className="admin-main">
+        <div className="container">
+          {!authenticated ? (
+            <section className="admin-login">
+              <span className="eyebrow">Restricted access</span>
+              <h1>Admin sign in</h1>
+              <p>Enter your admin password to continue.</p>
+              <form onSubmit={signIn}>
+                <label htmlFor="admin-password">Admin password</label>
+                <input id="admin-password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+                {error && <div className="error-message" role="alert">{error}</div>}
+                <button className="button" type="submit" disabled={loading}>{loading ? 'Checking…' : 'Sign in'} <ArrowRight size={17} /></button>
+              </form>
+              <Link to="/billing" className="text-button">Back to pricing <ArrowRight size={16} /></Link>
+            </section>
+          ) : (
+            <>
+              <header className="admin-header">
+                <div><span className="eyebrow">Techbuddyassist</span><h1>Admin dashboard</h1></div>
+                <button className="outline-button" onClick={signOut}>Sign out</button>
+              </header>
+              <div className="admin-tabs" role="tablist" aria-label="Admin sections">
+                <button role="tab" aria-selected={activeTab === 'plans'} className={activeTab === 'plans' ? 'is-active' : ''} onClick={() => setActiveTab('plans')}>Plans & pricing</button>
+                <button role="tab" aria-selected={activeTab === 'requests'} className={activeTab === 'requests' ? 'is-active' : ''} onClick={() => setActiveTab('requests')}>Quote requests <span>{requests.length}</span></button>
+                <button role="tab" aria-selected={activeTab === 'payments'} className={activeTab === 'payments' ? 'is-active' : ''} onClick={() => setActiveTab('payments')}>Custom payments <span>{customPayments.length}</span></button>
+              </div>
+              {error && <div className="error-message" role="alert">{error}</div>}
+              {notice && <div className="success-message" role="status">{notice}</div>}
+              {activeTab === 'plans' ? (
+                <section aria-label="Edit public plans">
+                  <div className="admin-plans-toolbar">
+                    <p>Changes update the public pricing page.</p>
+                    <button className="outline-button" type="button" onClick={() => setShowNewPlan(!showNewPlan)}>
+                      {showNewPlan ? 'Cancel' : 'Add plan'}
+                    </button>
+                  </div>
+                  {showNewPlan && (
+                    <form className="admin-plan-form admin-new-plan" onSubmit={addPlan}>
+                      <div className="admin-plan-heading"><h2>Add a support plan</h2><span>Shown on the public pricing page when active</span></div>
+                      <label>Card label<input maxLength="60" value={newPlan.category} onChange={(event) => setNewPlan((current) => ({ ...current, category: event.target.value }))} required /></label>
+                      <label>Plan name<input maxLength="100" value={newPlan.name} onChange={(event) => setNewPlan((current) => ({ ...current, name: event.target.value }))} required /></label>
+                      <label>Description<textarea maxLength="300" rows="2" value={newPlan.description} onChange={(event) => setNewPlan((current) => ({ ...current, description: event.target.value }))} required /></label>
+                      <label>Included feature<input maxLength="160" value={newPlan.feature} onChange={(event) => setNewPlan((current) => ({ ...current, feature: event.target.value }))} required /></label>
+                      <label>Starting price (USD)<input type="number" min="0" step="0.01" value={newPlan.price} onChange={(event) => setNewPlan((current) => ({ ...current, price: event.target.value }))} required /></label>
+                      <button className="button" type="submit">Create plan <Check size={16} /></button>
+                    </form>
+                  )}
+                  <div className="admin-plans">
+                  {plans.map((plan) => (
+                    <form className={`admin-plan-form${plan.isActive === false ? ' is-archived' : ''}`} key={plan.key} onSubmit={(event) => { event.preventDefault(); savePlan(plan) }}>
+                      <div className="admin-plan-heading"><h2>{plan.name}</h2><span>{plan.isActive === false ? 'Archived' : plan.key}</span></div>
+                      <label>Card label<input maxLength="60" value={plan.category} onChange={(event) => setPlans((current) => current.map((item) => item.key === plan.key ? { ...item, category: event.target.value } : item))} required /></label>
+                      <label>Plan name<input maxLength="100" value={plan.name} onChange={(event) => setPlans((current) => current.map((item) => item.key === plan.key ? { ...item, name: event.target.value } : item))} required /></label>
+                      <label>Description<textarea maxLength="300" rows="2" value={plan.description} onChange={(event) => setPlans((current) => current.map((item) => item.key === plan.key ? { ...item, description: event.target.value } : item))} required /></label>
+                      <label>Included feature<input maxLength="160" value={plan.feature} onChange={(event) => setPlans((current) => current.map((item) => item.key === plan.key ? { ...item, feature: event.target.value } : item))} required /></label>
+                      <label>Starting price (USD)<input type="number" min="0" step="0.01" value={(plan.amount / 100).toFixed(2)} onChange={(event) => setPlans((current) => current.map((item) => item.key === plan.key ? { ...item, amount: Math.round(Number(event.target.value) * 100) } : item))} required /></label>
+                      <div className="admin-plan-actions">
+                        <button className="button" type="submit">Save plan <Check size={16} /></button>
+                        <button className="admin-archive-button" type="button" onClick={() => setPlanActive(plan, plan.isActive === false)}>
+                          {plan.isActive === false ? 'Restore' : 'Archive'}
+                        </button>
+                      </div>
+                    </form>
+                  ))}
+                  </div>
+                </section>
+              ) : activeTab === 'requests' ? (
+                <section className="admin-requests" aria-label="Customer quote requests">
+                  {requests.length ? requests.map((request) => (
+                    <article className="admin-request" key={request._id}>
+                      <div><span className="eyebrow">{request.service}</span><h2>{request.name}</h2><a href={`mailto:${request.email}`}>{request.email}</a><a href={`tel:${request.phone}`}>{request.phone}</a><p>{request.message}</p></div>
+                      <label>Status<select value={request.status} onChange={(event) => updateRequestStatus(request._id, event.target.value)}><option>New</option><option>In Progress</option><option>Resolved</option></select></label>
+                    </article>
+                  )) : <p className="admin-empty">No quote requests yet.</p>}
+                </section>
+              ) : (
+                <section className="admin-custom-payments" aria-label="Create custom customer payments">
+                  <form className="admin-custom-payment-form" onSubmit={createCustomPayment}>
+                    <div className="admin-plan-heading"><h2>Create a payment link</h2><span>Stripe Checkout · USD</span></div>
+                    <div className="admin-payment-fields">
+                      <label>Customer name<input maxLength="100" autoComplete="name" value={customPayment.customerName} onChange={(event) => setCustomPayment((current) => ({ ...current, customerName: event.target.value }))} required /></label>
+                      <label>Customer email<input type="email" maxLength="254" autoComplete="email" value={customPayment.customerEmail} onChange={(event) => setCustomPayment((current) => ({ ...current, customerEmail: event.target.value }))} required /></label>
+                      <label className="admin-payment-description">Payment description<input maxLength="300" value={customPayment.description} onChange={(event) => setCustomPayment((current) => ({ ...current, description: event.target.value }))} required /></label>
+                      <label>Amount (USD)<input type="number" min="0.50" step="0.01" value={customPayment.amount} onChange={(event) => setCustomPayment((current) => ({ ...current, amount: event.target.value }))} required /></label>
+                    </div>
+                    <button className="button" type="submit">Create payment link <ArrowRight size={17} /></button>
+                  </form>
+                  {generatedPayment && (
+                    <div className="generated-payment" role="status">
+                      <div><span className="eyebrow">Payment link ready</span><h2>{generatedPayment.customerName} · ${(generatedPayment.amount / 100).toFixed(2)}</h2><p>{generatedPayment.customerEmail}</p></div>
+                      <div className="generated-payment-actions">
+                        <a className="button" href={generatedPayment.checkoutUrl} target="_blank" rel="noreferrer">Open checkout <ArrowRight size={16} /></a>
+                        <button className="outline-button" type="button" onClick={copyPaymentLink}>{copiedPaymentLink ? 'Copied' : 'Copy link'}</button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="admin-payment-history">
+                    <h2>Recent custom payments</h2>
+                    {customPayments.length ? customPayments.map((payment) => (
+                      <article className="admin-payment-row" key={payment._id}>
+                        <div><strong>{payment.customerName}</strong><span>{payment.customerEmail}</span><small>{payment.description}</small></div>
+                        <strong>${(payment.amount / 100).toFixed(2)}</strong>
+                        <span className={`payment-status is-${payment.status}`}>{payment.status}</span>
+                        <a href={payment.checkoutUrl} target="_blank" rel="noreferrer">Open link <ArrowRight size={14} /></a>
+                      </article>
+                    )) : <p className="admin-empty">No custom payments yet.</p>}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+      </main>
     </div>
   )
 }
@@ -696,6 +915,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/billing" element={<BillingPageRoute />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/billing/success" element={<StripeStatusPage status="success" />} />
         <Route path="/billing/cancel" element={<StripeStatusPage status="cancelled" />} />
       </Routes>

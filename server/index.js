@@ -5,7 +5,9 @@ import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import mongoose from 'mongoose'
+import { Buffer } from 'node:buffer'
 import crypto from 'node:crypto'
+import jwt from 'jsonwebtoken'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Stripe from 'stripe'
@@ -17,44 +19,14 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const port = process.env.PORT || 5000
 const payments = []
+const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false })
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173'
-const stripeCatalog = [
-  {
-    key: 'support-session',
-    name: 'Techbuddyassist Support Session',
-    description: 'One-time guided troubleshooting and remote tech help.',
-    amount: 14900,
-    type: 'payment',
-    currency: 'usd',
-  },
-  {
-    key: 'essential-plan',
-    name: 'Essential Support Plan',
-    description: 'Monthly tech support plan with priority response and ongoing guidance.',
-    amount: 4900,
-    type: 'subscription',
-    currency: 'usd',
-    interval: 'month',
-  },
-  {
-    key: 'pro-plan',
-    name: 'Pro Support Plan',
-    description: 'Priority monthly support for homes, offices, and growing businesses.',
-    amount: 9900,
-    type: 'subscription',
-    currency: 'usd',
-    interval: 'month',
-  },
-  {
-    key: 'business-plan',
-    name: 'Business IT Support',
-    description: 'Ongoing monthly IT support for business systems and device setup.',
-    amount: 14900,
-    type: 'subscription',
-    currency: 'usd',
-    interval: 'month',
-  },
+const adminSessionSecret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : crypto.randomBytes(32).toString('hex'))
+const defaultSupportPlans = [
+  { key: 'quick-support', category: 'QUICK SUPPORT', name: 'Quick support', description: 'A focused answer for a single question.', feature: 'One support conversation', amount: 4900, sortOrder: 1, isActive: true },
+  { key: 'remote-assistance', category: 'REMOTE ASSISTANCE', name: 'Remote assistance', description: 'Hands-on help for a supported device.', feature: 'Guided remote session', amount: 9900, sortOrder: 2, isActive: true },
+  { key: 'premium-support', category: 'PREMIUM SUPPORT', name: 'Premium support', description: 'A deeper support session for multiple needs.', feature: 'Priority support window', amount: 19900, sortOrder: 3, isActive: true },
 ]
 
 app.use(helmet())
@@ -67,9 +39,224 @@ app.use(express.static(path.join(__dirname, '../dist')))
 const validContact = (body) => body.name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) && body.phone && body.service && body.message?.length >= 10
 const contactSchema = new mongoose.Schema({ name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 }, email: { type: String, required: true, lowercase: true, trim: true }, phone: { type: String, required: true, trim: true }, service: { type: String, required: true, maxlength: 100 }, message: { type: String, required: true, maxlength: 1000 }, contactPreference: { type: String, enum: ['Email', 'Phone'], default: 'Email' }, status: { type: String, enum: ['New', 'In Progress', 'Resolved'], default: 'New' } }, { timestamps: true })
 const Contact = mongoose.model('Contact', contactSchema)
+const supportPlanSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  category: { type: String, required: true, maxlength: 60 },
+  name: { type: String, required: true, maxlength: 100 },
+  description: { type: String, required: true, maxlength: 300 },
+  feature: { type: String, required: true, maxlength: 160 },
+  amount: { type: Number, required: true, min: 0, max: 100000000 },
+  sortOrder: { type: Number, required: true, default: 0 },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true })
+const SupportPlan = mongoose.model('SupportPlan', supportPlanSchema)
+const customPaymentSchema = new mongoose.Schema({
+  customerName: { type: String, required: true, maxlength: 100 },
+  customerEmail: { type: String, required: true, lowercase: true, trim: true },
+  description: { type: String, required: true, maxlength: 300 },
+  amount: { type: Number, required: true, min: 50, max: 100000000 },
+  currency: { type: String, default: 'usd', lowercase: true },
+  stripeSessionId: { type: String, required: true, unique: true },
+  checkoutUrl: { type: String, required: true },
+  status: { type: String, enum: ['pending', 'processing', 'paid', 'expired'], default: 'pending' },
+  paidAt: Date,
+}, { timestamps: true })
+const CustomPayment = mongoose.model('CustomPayment', customPaymentSchema)
 const isDatabaseReady = () => mongoose.connection.readyState === 1
+const ensureSupportPlans = () => SupportPlan.bulkWrite(defaultSupportPlans.map((plan) => ({
+  updateOne: { filter: { key: plan.key }, update: { $setOnInsert: plan }, upsert: true },
+})))
+const hasAdminConfiguration = () => process.env.ADMIN_PASSWORD?.length >= 12 && adminSessionSecret &&
+  (process.env.NODE_ENV !== 'production' || (adminSessionSecret.length >= 32 && adminSessionSecret !== 'replace-with-a-long-random-secret'))
+
+const requireAdmin = (req, res, next) => {
+  if (!hasAdminConfiguration()) {
+    return res.status(503).json({ message: 'Admin password is not configured. Set ADMIN_PASSWORD to at least 12 characters.' })
+  }
+  const token = req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('admin_session='))?.slice('admin_session='.length)
+  if (!token) return res.status(401).json({ message: 'Admin sign-in required.' })
+  try {
+    const session = jwt.verify(token, adminSessionSecret)
+    if (session.role !== 'admin') return res.status(403).json({ message: 'Admin access required.' })
+    next()
+  } catch {
+    return res.status(401).json({ message: 'Admin session expired. Please sign in again.' })
+  }
+}
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, database: isDatabaseReady() ? 'connected' : 'unavailable' }))
+app.post('/api/admin/login', adminLoginLimiter, (req, res) => {
+  const configuredPassword = process.env.ADMIN_PASSWORD
+  if (!hasAdminConfiguration()) {
+    return res.status(503).json({ message: 'Admin password is not configured. Set ADMIN_PASSWORD to at least 12 characters.' })
+  }
+  const submittedPassword = Buffer.from(String(req.body?.password || ''))
+  const expectedPassword = Buffer.from(configuredPassword)
+  if (submittedPassword.length !== expectedPassword.length || !crypto.timingSafeEqual(submittedPassword, expectedPassword)) {
+    return res.status(401).json({ message: 'The admin password is incorrect.' })
+  }
+  const token = jwt.sign({ role: 'admin' }, adminSessionSecret, { expiresIn: '8h' })
+  res.cookie('admin_session', token, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 8 * 60 * 60 * 1000,
+    path: '/api',
+  })
+  res.json({ authenticated: true })
+})
+app.post('/api/admin/logout', (_req, res) => {
+  res.clearCookie('admin_session', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', path: '/api' })
+  res.status(204).end()
+})
+app.get('/api/admin/session', (req, res) => {
+  if (!hasAdminConfiguration()) return res.json({ configured: false, authenticated: false })
+  const token = req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('admin_session='))?.slice('admin_session='.length)
+  try {
+    const session = token ? jwt.verify(token, adminSessionSecret) : null
+    res.json({ configured: true, authenticated: session?.role === 'admin' })
+  } catch {
+    res.json({ configured: true, authenticated: false })
+  }
+})
+app.get('/api/support-plans', async (_req, res) => {
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Support plans are temporarily unavailable.' })
+  try {
+    await ensureSupportPlans()
+    const plans = await SupportPlan.find({ isActive: { $ne: false } }).sort({ sortOrder: 1 }).select('-_id key category name description feature amount').lean()
+    res.json({ plans })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to load support plans.', error: error.message })
+  }
+})
+app.get('/api/admin/support-plans', requireAdmin, async (_req, res) => {
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable.' })
+  try {
+    await ensureSupportPlans()
+    const plans = await SupportPlan.find().sort({ sortOrder: 1 }).lean()
+    res.json({ plans })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to load plans.', error: error.message })
+  }
+})
+app.post('/api/admin/support-plans', requireAdmin, async (req, res) => {
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable.' })
+  const { category, name, description, feature, amount } = req.body || {}
+  if (typeof category !== 'string' || !category.trim() || typeof name !== 'string' || !name.trim() ||
+      typeof description !== 'string' || !description.trim() || typeof feature !== 'string' || !feature.trim() ||
+      !Number.isInteger(amount) || amount < 0 || amount > 100000000) {
+    return res.status(400).json({ message: 'Provide a category, name, description, feature, and a valid amount in cents.' })
+  }
+  try {
+    const latestPlan = await SupportPlan.findOne().sort({ sortOrder: -1 }).select('sortOrder').lean()
+    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'plan'
+    const plan = await SupportPlan.create({
+      key: `${slug}-${crypto.randomBytes(3).toString('hex')}`,
+      category: category.trim(),
+      name: name.trim(),
+      description: description.trim(),
+      feature: feature.trim(),
+      amount,
+      sortOrder: (latestPlan?.sortOrder || 0) + 1,
+      isActive: true,
+    })
+    res.status(201).json({ plan: plan.toObject() })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to add support plan.', error: error.message })
+  }
+})
+app.patch('/api/admin/support-plans/:key', requireAdmin, async (req, res) => {
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable.' })
+  const { category, name, description, feature, amount } = req.body || {}
+  if (typeof category !== 'string' || !category.trim() || typeof name !== 'string' || !name.trim() ||
+      typeof description !== 'string' || !description.trim() || typeof feature !== 'string' || !feature.trim() ||
+      !Number.isInteger(amount) || amount < 0 || amount > 100000000) {
+    return res.status(400).json({ message: 'Provide a category, name, description, feature, and a valid amount in cents.' })
+  }
+  try {
+    const plan = await SupportPlan.findOneAndUpdate(
+      { key: req.params.key },
+      { category: category.trim(), name: name.trim(), description: description.trim(), feature: feature.trim(), amount },
+      { new: true, runValidators: true },
+    ).lean()
+    if (!plan) return res.status(404).json({ message: 'Support plan not found.' })
+    res.json({ plan })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to update support plan.', error: error.message })
+  }
+})
+app.patch('/api/admin/support-plans/:key/status', requireAdmin, async (req, res) => {
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable.' })
+  if (typeof req.body?.isActive !== 'boolean') return res.status(400).json({ message: 'Provide isActive as true or false.' })
+  try {
+    const plan = await SupportPlan.findOneAndUpdate(
+      { key: req.params.key },
+      { isActive: req.body.isActive },
+      { new: true, runValidators: true },
+    ).lean()
+    if (!plan) return res.status(404).json({ message: 'Support plan not found.' })
+    res.json({ plan })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to update plan status.', error: error.message })
+  }
+})
+app.get('/api/admin/custom-payments', requireAdmin, async (_req, res) => {
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable.' })
+  try {
+    const payments = await CustomPayment.find().sort({ createdAt: -1 }).limit(100).lean()
+    res.json({ payments })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to load custom payments.', error: error.message })
+  }
+})
+app.post('/api/admin/custom-payments', requireAdmin, async (req, res) => {
+  if (!stripe) return res.status(503).json({ message: 'Stripe is not configured.' })
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable.' })
+  const { customerName, customerEmail, description, amount } = req.body || {}
+  if (typeof customerName !== 'string' || !customerName.trim() || customerName.length > 100 ||
+      typeof customerEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) ||
+      typeof description !== 'string' || !description.trim() || description.length > 300 ||
+      !Number.isInteger(amount) || amount < 50 || amount > 100000000) {
+    return res.status(400).json({ message: 'Provide a customer name, valid email, description, and USD amount of at least $0.50.' })
+  }
+
+  let session
+  try {
+    const paymentReference = crypto.randomUUID()
+    session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      managed_payments: { enabled: false },
+      customer_email: customerEmail.trim().toLowerCase(),
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          unit_amount: amount,
+          product_data: {
+            name: description.trim(),
+            description: `Custom support payment for ${customerName.trim()}`,
+          },
+        },
+        quantity: 1,
+      }],
+      success_url: `${frontendUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/billing/cancel`,
+      metadata: { paymentReference, source: 'techbuddyassist-admin' },
+    })
+    const payment = await CustomPayment.create({
+      customerName: customerName.trim(),
+      customerEmail: customerEmail.trim().toLowerCase(),
+      description: description.trim(),
+      amount,
+      stripeSessionId: session.id,
+      checkoutUrl: session.url,
+      status: 'pending',
+    })
+    res.status(201).json({ payment })
+  } catch (error) {
+    if (session?.id) await stripe.checkout.sessions.expire(session.id).catch(() => undefined)
+    res.status(500).json({ message: 'Unable to create custom payment.', error: error.message })
+  }
+})
 app.post('/api/contact', async (req, res) => {
   if (!validContact(req.body)) return res.status(400).json({ message: 'Please provide valid contact details and a message of at least 10 characters.' })
   if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable. Please try again.' })
@@ -80,94 +267,11 @@ app.post('/api/contact', async (req, res) => {
     res.status(500).json({ message: 'Unable to save support request data', error: error.message })
   }
 })
-app.get('/api/contact', async (_req, res) => { res.json(await Contact.find().sort({ createdAt: -1 })) })
-app.get('/api/contact/:id', async (req, res) => { const record = await Contact.findById(req.params.id); if (!record) return res.status(404).json({ message: 'Request not found' }); res.json(record) })
-app.patch('/api/contact/:id', async (req, res) => { if (!['New', 'In Progress', 'Resolved'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid status' }); const record = await Contact.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true, runValidators: true }); if (!record) return res.status(404).json({ message: 'Request not found' }); res.json(record) })
-app.delete('/api/contact/:id', async (req, res) => { const record = await Contact.findByIdAndDelete(req.params.id); if (!record) return res.status(404).json({ message: 'Request not found' }); res.status(204).end() })
+app.get('/api/contact', requireAdmin, async (_req, res) => { res.json(await Contact.find().sort({ createdAt: -1 }).limit(200)) })
+app.get('/api/contact/:id', requireAdmin, async (req, res) => { const record = await Contact.findById(req.params.id); if (!record) return res.status(404).json({ message: 'Request not found' }); res.json(record) })
+app.patch('/api/contact/:id', requireAdmin, async (req, res) => { if (!['New', 'In Progress', 'Resolved'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid status' }); const record = await Contact.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true, runValidators: true }); if (!record) return res.status(404).json({ message: 'Request not found' }); res.json(record) })
+app.delete('/api/contact/:id', requireAdmin, async (req, res) => { const record = await Contact.findByIdAndDelete(req.params.id); if (!record) return res.status(404).json({ message: 'Request not found' }); res.status(204).end() })
 app.get('/api/stripe/config', (_req, res) => { res.json({ publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '' }) })
-app.get('/api/stripe/products', (_req, res) => { res.json({ products: stripeCatalog }) })
-app.post('/api/stripe/create-checkout-session', async (req, res) => {
-  if (!stripe) return res.status(503).json({ message: 'Stripe is not configured. Add STRIPE_SECRET_KEY first.' })
-
-  const { productKey = 'support-session', email } = req.body || {}
-  const selectedProduct = stripeCatalog.find((product) => product.key === productKey) || stripeCatalog[0]
-
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: selectedProduct.type === 'subscription' ? 'subscription' : 'payment',
-      managed_payments: { enabled: false },
-      customer_email: email || undefined,
-      line_items: [{
-        price_data: selectedProduct.type === 'subscription'
-          ? {
-              currency: selectedProduct.currency,
-              recurring: { interval: selectedProduct.interval || 'month' },
-              unit_amount: Number(selectedProduct.amount) || 0,
-              product_data: {
-                name: selectedProduct.name,
-                description: selectedProduct.description,
-              },
-            }
-          : {
-              currency: selectedProduct.currency,
-              product_data: {
-                name: selectedProduct.name,
-                description: selectedProduct.description,
-              },
-              unit_amount: Number(selectedProduct.amount) || 0,
-            },
-        quantity: 1,
-      }],
-      success_url: `${frontendUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${frontendUrl}/billing/cancel`,
-      metadata: { productKey: selectedProduct.key, source: 'techbuddyassist', email: email || '' },
-      invoice_creation: selectedProduct.type === 'payment' ? { enabled: true } : undefined,
-    })
-    res.json({ url: session.url, sessionId: session.id, product: selectedProduct })
-  } catch (error) {
-    res.status(500).json({ message: 'Unable to create Stripe checkout session.', error: error.message })
-  }
-})
-app.post('/api/stripe/customer-portal', async (req, res) => {
-  if (!stripe) return res.status(503).json({ message: 'Stripe is not configured. Add STRIPE_SECRET_KEY first.' })
-  const { email } = req.body || {}
-  try {
-    const customer = email ? await stripe.customers.create({ email }).catch(() => null) : null
-    const portal = await stripe.billingPortal.sessions.create({
-      customer: customer?.id || undefined,
-      return_url: `${frontendUrl}/billing`,
-    })
-    res.json({ url: portal.url })
-  } catch (error) {
-    res.status(500).json({ message: 'Unable to create Stripe billing portal session.', error: error.message })
-  }
-})
-app.post('/api/stripe/invoice', async (req, res) => {
-  if (!stripe) return res.status(503).json({ message: 'Stripe is not configured. Add STRIPE_SECRET_KEY first.' })
-  const { customerEmail = 'support@techbuddyassist.com', amount = 14900, description = 'Techbuddyassist support invoice' } = req.body || {}
-  try {
-    const customer = await stripe.customers.create({ email: customerEmail }).catch(() => null)
-    const invoice = await stripe.invoices.create({
-      customer: customer?.id || undefined,
-      collection_method: 'send_invoice',
-      days_until_due: 14,
-      currency: 'usd',
-      description,
-      auto_advance: false,
-      metadata: { source: 'techbuddyassist' },
-    })
-    const invoiceItem = await stripe.invoiceItems.create({
-      customer: customer?.id || undefined,
-      amount: Number(amount) || 14900,
-      currency: 'usd',
-      description,
-      invoice: invoice.id,
-    })
-    res.json({ invoiceId: invoice.id, invoiceItemId: invoiceItem.id, customerId: customer?.id || null })
-  } catch (error) {
-    res.status(500).json({ message: 'Unable to create Stripe invoice.', error: error.message })
-  }
-})
 app.post('/api/stripe/webhook', async (req, res) => {
   if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(501).json({ message: 'Stripe webhook is not configured.' })
   const sig = req.headers['stripe-signature']
@@ -181,6 +285,15 @@ app.post('/api/stripe/webhook', async (req, res) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     payments.push({ status: 'paid', sessionId: session.id, amount: session.amount_total, metadata: session.metadata, createdAt: new Date() })
+    await CustomPayment.findOneAndUpdate(
+      { stripeSessionId: session.id },
+      { status: session.payment_status === 'paid' ? 'paid' : 'processing', paidAt: session.payment_status === 'paid' ? new Date() : undefined },
+    ).catch((error) => console.error(`Unable to update custom payment status: ${error.message}`))
+  }
+
+  if (event.type === 'checkout.session.expired') {
+    await CustomPayment.findOneAndUpdate({ stripeSessionId: event.data.object.id }, { status: 'expired' })
+      .catch((error) => console.error(`Unable to mark custom payment expired: ${error.message}`))
   }
 
   if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted' || event.type === 'invoice.paid') {
