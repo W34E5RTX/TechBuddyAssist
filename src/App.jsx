@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { BrowserRouter, Link, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, TabletSmartphone, Wifi, X } from 'lucide-react'
 import './App.css'
@@ -915,6 +915,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/billing" element={<BillingPageRoute />} />
+        <Route path="/billing/admin" element={<Navigate to="/admin" replace />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/billing/success" element={<StripeStatusPage status="success" />} />
         <Route path="/billing/cancel" element={<StripeStatusPage status="cancelled" />} />
