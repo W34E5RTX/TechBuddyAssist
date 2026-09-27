@@ -1,4 +1,5 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
+import { BrowserRouter, Link, Route, Routes, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, TabletSmartphone, Wifi, X } from 'lucide-react'
 import './App.css'
@@ -84,6 +85,54 @@ function FooterLinkGroup({ title, links }) {
   )
 }
 
+function BillingPage({ products, onCheckout, onOpenPortal, billingNotice }) {
+  const subscriptionProducts = products.filter((product) => product.type === 'subscription')
+  const oneTimeProduct = products.find((product) => product.type !== 'subscription')
+  const planLabels = ['Quick support', 'Remote assistance', 'Premium support']
+  const planFeatures = ['One support conversation', 'Guided remote session', 'Priority support window']
+
+  return (
+    <section id="billing" className="section billing-section">
+      <div className="container">
+        <div className="section-heading billing-heading">
+          <span className="eyebrow">Simple starting points</span>
+          <h2>Choose your <em>support plan.</em></h2>
+          <p>Choose a starting plan. Final scope and pricing are confirmed before work begins.</p>
+        </div>
+        {billingNotice && <div className="success-message" style={{ marginBottom: '20px' }}>{billingNotice}</div>}
+        <div className="pricing-grid">
+          {subscriptionProducts.map((product, index) => {
+            const isFeatured = index === 1
+            return (
+            <article className={`pricing-card${isFeatured ? ' is-featured' : ''}`} key={product.key}>
+              {isFeatured && <span className="pricing-popular">Most requested</span>}
+              <span className="pricing-tag">{planLabels[index] || 'Monthly support'}</span>
+              <h3>{product.name}</h3>
+              <div className="price-line">
+                <strong>${(product.amount / 100).toFixed(2)}</strong>
+                <span>/ month</span>
+              </div>
+              <p>{product.description}</p>
+              <div className="pricing-feature"><Check size={17} /><span>{planFeatures[index] || 'Ongoing support'}</span></div>
+              <button className={`plan-button ${isFeatured ? 'button' : 'outline-button'}`} onClick={() => onCheckout(product.key)}>
+                Choose plan <ArrowRight size={17} />
+              </button>
+            </article>
+            )
+          })}
+        </div>
+        {oneTimeProduct && (
+          <div className="one-time-plan">
+            <div><span className="eyebrow">Prefer a single session?</span><p>{oneTimeProduct.name} <strong>${(oneTimeProduct.amount / 100).toFixed(2)}</strong></p></div>
+            <button className="text-button" onClick={() => onCheckout(oneTimeProduct.key)}>Choose one-time support <ArrowRight size={16} /></button>
+          </div>
+        )}
+        <div className="billing-manage"><button className="text-button" onClick={onOpenPortal}>Manage billing <ArrowRight size={16} /></button></div>
+      </div>
+    </section>
+  )
+}
+
 function Footer({ scrollTo }) {
   const navigationLinks = [
     { label: 'Home', href: '#home' },
@@ -136,12 +185,75 @@ function Footer({ scrollTo }) {
   )
 }
 
-function App() {
+function LandingPage() {
+  const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [openFaq, setOpenFaq] = useState(null)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
   const [formState, setFormState] = useState('idle')
   const [formError, setFormError] = useState('')
+  const [checkoutState, setCheckoutState] = useState('idle')
+  const [checkoutError, setCheckoutError] = useState('')
+  const [products, setProducts] = useState([
+    { key: 'support-session', name: 'Techbuddyassist Support Session', description: 'One-time guided troubleshooting and remote tech help.', amount: 14900, type: 'payment' },
+    { key: 'essential-plan', name: 'Essential Support Plan', description: 'Monthly tech support plan with priority response and ongoing guidance.', amount: 4900, type: 'subscription' },
+    { key: 'pro-plan', name: 'Pro Support Plan', description: 'Priority monthly support for homes, offices, and growing businesses.', amount: 9900, type: 'subscription' },
+    { key: 'business-plan', name: 'Business IT Support', description: 'Ongoing monthly IT support for device setup and business support.', amount: 14900, type: 'subscription' },
+  ])
+  const [billingNotice, setBillingNotice] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('checkout')
+    const productKey = params.get('product')
+    if (status === 'success') {
+      setBillingNotice(`Payment successful for ${productKey || 'your selected support plan'}.`)
+    }
+    if (status === 'cancelled') {
+      setBillingNotice('Checkout was cancelled. You can try another support plan at any time.')
+    }
+
+    fetch('/api/stripe/products')
+      .then((response) => response.json())
+      .then((data) => {
+        if (Array.isArray(data.products) && data.products.length) setProducts(data.products)
+      })
+      .catch(() => undefined)
+  }, [])
+
+  const startStripeCheckout = async (productKey = 'support-session') => {
+    setCheckoutState('loading')
+    setCheckoutError('')
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productKey, email: 'support@techbuddyassist.com' }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to start the Stripe checkout session.')
+      if (data.url) window.location.href = data.url
+      else throw new Error('Stripe checkout did not return a redirect URL.')
+    } catch (error) {
+      setCheckoutState('error')
+      setCheckoutError(error.message || 'Something went wrong while starting checkout.')
+    }
+  }
+
+  const openBillingPortal = async () => {
+    try {
+      const response = await fetch('/api/stripe/customer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'support@techbuddyassist.com' }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to open the billing portal.')
+      if (data.url) window.location.href = data.url
+    } catch (error) {
+      setBillingNotice(error.message || 'Unable to open the billing portal.')
+    }
+  }
 
   const testimonials = [
     ['“The technician explained everything clearly and never made me feel silly for asking questions.”', 'Demo Customer', 'Home technology support'],
@@ -194,8 +306,11 @@ function App() {
               <p className="hero-lede">Techbuddyassist helps individuals, families, seniors, professionals, home offices, and small businesses understand, manage, and resolve technology problems with clear, patient, professional assistance. No jargon. No scare tactics. Just real help from real people who know technology.</p>
               <div className="hero-actions">
                 <ActionButton label="Get Support" onClick={() => scrollTo('contact')} />
-                <button className="text-button" onClick={() => scrollTo('services')}>Explore services <ArrowRight size={16} /></button>
+                <button className="button" onClick={() => navigate('/billing')} disabled={checkoutState === 'loading'}>
+                  {checkoutState === 'loading' ? 'Opening Stripe…' : 'View billing plans'} <ArrowRight size={17} />
+                </button>
               </div>
+              {checkoutState === 'error' && <div className="error-message" style={{ marginTop: '16px' }}>{checkoutError}</div>}
               <div className="hero-note">
                 <div className="avatar-stack"><span>JM</span><span>RK</span><span>+</span></div>
                 <span><b>Real people. Clear answers.</b><br />Support that meets you where you are.</span>
@@ -409,6 +524,8 @@ function App() {
           </div>
         </section>
 
+        <BillingPage products={products} onCheckout={startStripeCheckout} onOpenPortal={openBillingPortal} billingNotice={billingNotice} />
+
         <section id="faq" className="section faq-section">
           <div className="container faq-grid">
             <div>
@@ -478,6 +595,111 @@ function App() {
       </main>
       <Footer scrollTo={scrollTo} />
     </div>
+  )
+}
+
+function StripeStatusPage({ status }) {
+  const isSuccess = status === 'success'
+
+  return (
+    <div className="site-shell">
+      <div className="announcement"><span>Stripe</span> {isSuccess ? 'Your payment was successful.' : 'Your checkout was cancelled.'}</div>
+      <div className="section">
+        <div className="container" style={{ maxWidth: '760px', paddingTop: '60px' }}>
+          <div className="pricing-card" style={{ padding: '36px', textAlign: 'center' }}>
+            <span className="eyebrow">Billing</span>
+            <h2 style={{ margin: '16px 0 10px' }}>{isSuccess ? 'Thanks for your purchase.' : 'Checkout cancelled'}</h2>
+            <p style={{ marginBottom: '24px', color: '#5a6d7a' }}>
+              {isSuccess
+                ? 'Your Stripe session is complete and your support plan is ready to use.'
+                : 'No charge was made. You can choose another plan or return to the support page.'}
+            </p>
+            <div className="hero-actions" style={{ justifyContent: 'center' }}>
+              <Link to="/" className="button">Back to home</Link>
+              <Link to="/billing" className="outline-button">View billing</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BillingPageRoute() {
+  const navigate = useNavigate()
+  const [products, setProducts] = useState([
+    { key: 'support-session', name: 'Techbuddyassist Support Session', description: 'One-time guided troubleshooting and remote tech help.', amount: 14900, type: 'payment' },
+    { key: 'essential-plan', name: 'Essential Support Plan', description: 'Monthly tech support plan with priority response and ongoing guidance.', amount: 4900, type: 'subscription' },
+    { key: 'pro-plan', name: 'Pro Support Plan', description: 'Priority monthly support for homes, offices, and growing businesses.', amount: 9900, type: 'subscription' },
+    { key: 'business-plan', name: 'Business IT Support', description: 'Ongoing monthly IT support for device setup and business support.', amount: 14900, type: 'subscription' },
+  ])
+  const [billingNotice, setBillingNotice] = useState('')
+
+  useEffect(() => {
+    fetch('/api/stripe/products')
+      .then((response) => response.json())
+      .then((data) => {
+        if (Array.isArray(data.products) && data.products.length) setProducts(data.products)
+      })
+      .catch(() => undefined)
+  }, [])
+
+  const startStripeCheckout = async (productKey = 'support-session') => {
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productKey, email: 'support@techbuddyassist.com' }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to start the Stripe checkout session.')
+      if (data.url) window.location.href = data.url
+    } catch (error) {
+      setBillingNotice(error.message || 'Unable to start the Stripe checkout flow.')
+    }
+  }
+
+  const openBillingPortal = async () => {
+    try {
+      const response = await fetch('/api/stripe/customer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'support@techbuddyassist.com' }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to open the billing portal.')
+      if (data.url) window.location.href = data.url
+    } catch (error) {
+      setBillingNotice(error.message || 'Unable to open the billing portal.')
+    }
+  }
+
+  return (
+    <div className="site-shell">
+      <div className="announcement"><span>Billing</span> Choose a support plan or manage your Stripe account.</div>
+      <header className="nav-wrap">
+        <nav className="nav container" aria-label="Billing navigation">
+          <button className="brand" onClick={() => navigate('/')}>
+            <span className="brand-wordmark"><span className="brand-tech">Tech</span><span className="brand-buddy">Buddy</span><span className="brand-assist">Assist</span></span>
+          </button>
+          <button className="outline-button" onClick={() => navigate('/')}>Back home</button>
+        </nav>
+      </header>
+      <BillingPage products={products} onCheckout={startStripeCheckout} onOpenPortal={openBillingPortal} billingNotice={billingNotice} />
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/billing" element={<BillingPageRoute />} />
+        <Route path="/billing/success" element={<StripeStatusPage status="success" />} />
+        <Route path="/billing/cancel" element={<StripeStatusPage status="cancelled" />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
