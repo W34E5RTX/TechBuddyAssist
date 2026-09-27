@@ -66,12 +66,20 @@ const isDatabaseReady = () => mongoose.connection.readyState === 1
 const ensureSupportPlans = () => SupportPlan.bulkWrite(defaultSupportPlans.map((plan) => ({
   updateOne: { filter: { key: plan.key }, update: { $setOnInsert: plan }, upsert: true },
 })))
-const hasAdminConfiguration = () => process.env.ADMIN_PASSWORD?.length >= 12 && adminSessionSecret &&
-  (process.env.NODE_ENV !== 'production' || (adminSessionSecret.length >= 32 && adminSessionSecret !== 'replace-with-a-long-random-secret'))
+const missingAdminConfiguration = () => {
+  const missing = []
+  if (process.env.ADMIN_PASSWORD?.length < 12) missing.push('ADMIN_PASSWORD (at least 12 characters)')
+  if (!adminSessionSecret || (process.env.NODE_ENV === 'production' &&
+      (adminSessionSecret.length < 32 || adminSessionSecret === 'replace-with-a-long-random-secret'))) {
+    missing.push('JWT_SECRET (at least 32 random characters)')
+  }
+  return missing
+}
+const hasAdminConfiguration = () => missingAdminConfiguration().length === 0
 
 const requireAdmin = (req, res, next) => {
   if (!hasAdminConfiguration()) {
-    return res.status(503).json({ message: 'Admin password is not configured. Set ADMIN_PASSWORD to at least 12 characters.' })
+    return res.status(503).json({ message: `Admin is not configured. Set ${missingAdminConfiguration().join(' and ')} in the deployment environment.` })
   }
   const token = req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('admin_session='))?.slice('admin_session='.length)
   if (!token) return res.status(401).json({ message: 'Admin sign-in required.' })
@@ -88,7 +96,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, database: isDatabaseR
 app.post('/api/admin/login', adminLoginLimiter, (req, res) => {
   const configuredPassword = process.env.ADMIN_PASSWORD
   if (!hasAdminConfiguration()) {
-    return res.status(503).json({ message: 'Admin password is not configured. Set ADMIN_PASSWORD to at least 12 characters.' })
+    return res.status(503).json({ message: `Admin is not configured. Set ${missingAdminConfiguration().join(' and ')} in the deployment environment.` })
   }
   const submittedPassword = Buffer.from(String(req.body?.password || ''))
   const expectedPassword = Buffer.from(configuredPassword)
@@ -110,7 +118,8 @@ app.post('/api/admin/logout', (_req, res) => {
   res.status(204).end()
 })
 app.get('/api/admin/session', (req, res) => {
-  if (!hasAdminConfiguration()) return res.json({ configured: false, authenticated: false })
+  const missing = missingAdminConfiguration()
+  if (missing.length) return res.json({ configured: false, authenticated: false, missing })
   const token = req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('admin_session='))?.slice('admin_session='.length)
   try {
     const session = token ? jwt.verify(token, adminSessionSecret) : null

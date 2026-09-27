@@ -642,7 +642,7 @@ function AdminPage() {
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.message || 'Unable to check admin session.')
         if (!data.configured) {
-          setError('Admin password is not configured. Set ADMIN_PASSWORD in the server environment.')
+          setError(`Admin is not configured. Set ${data.missing?.join(' and ') || 'ADMIN_PASSWORD and JWT_SECRET'} in the production environment, then redeploy.`)
         } else if (data.authenticated) {
           return loadAdminData()
         }
