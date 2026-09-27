@@ -37,13 +37,22 @@ function ActionButton({ label = 'Get Support', onClick, variant = 'primary' }) {
   )
 }
 
+function LogoWordmark({ compact = false }) {
+  return (
+    <span className={`brand-wordmark ${compact ? 'brand-wordmark-compact' : ''}`} aria-label="Techbuddyassist">
+      <span className="brand-tech">Tech</span>
+      <span className="brand-buddy">Buddy</span>
+      <span className="brand-assist">Assist</span>
+    </span>
+  )
+}
+
 function Nav({ menuOpen, setMenuOpen, scrollTo }) {
   return (
     <header className="nav-wrap">
       <nav className="nav container" aria-label="Main navigation">
         <button className="brand" onClick={() => scrollTo('home')}>
-          <span className="brand-mark"><Sparkles size={17} /></span>
-          Techbuddyassist
+          <LogoWordmark />
         </button>
         <button className="menu-toggle" aria-label="Toggle navigation" onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? <X /> : <Menu />}
@@ -106,8 +115,7 @@ function Footer({ scrollTo }) {
       <div className="container footer-grid">
         <div>
           <button className="brand footer-brand" onClick={() => scrollTo('home')}>
-            <span className="brand-mark"><Sparkles size={17} /></span>
-            Techbuddyassist
+            <LogoWordmark compact />
           </button>
           <p>Simple, reliable technology support for real life.</p>
           <address className="footer-contact">
