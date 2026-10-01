@@ -592,6 +592,7 @@ function BillingPageRoute() {
 
 function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [plans, setPlans] = useState(defaultSupportPlans)
   const [showNewPlan, setShowNewPlan] = useState(false)
@@ -642,7 +643,7 @@ function AdminPage() {
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.message || 'Unable to check admin session.')
         if (!data.configured) {
-          setError(`Admin is not configured. Set ${data.missing?.join(' and ') || 'ADMIN_PASSWORD and JWT_SECRET'} in the production environment, then redeploy.`)
+          setError(`Admin is not configured. Add ${data.missing?.join(' and ') || 'ADMIN_EMAIL, ADMIN_PASSWORD, and JWT_SECRET'} under Vercel Project Settings > Environment Variables, then redeploy.`)
         } else if (data.authenticated) {
           return loadAdminData()
         }
@@ -658,10 +659,11 @@ function AdminPage() {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.message || 'Unable to sign in.')
+      setEmail('')
       setPassword('')
       await loadAdminData()
     } catch (requestError) {
@@ -798,8 +800,10 @@ function AdminPage() {
             <section className="admin-login">
               <span className="eyebrow">Restricted access</span>
               <h1>Admin sign in</h1>
-              <p>Enter your admin password to continue.</p>
+              <p>Sign in with your admin email and password.</p>
               <form onSubmit={signIn}>
+                <label htmlFor="admin-email">Admin email</label>
+                <input id="admin-email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
                 <label htmlFor="admin-password">Admin password</label>
                 <input id="admin-password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
                 {error && <div className="error-message" role="alert">{error}</div>}

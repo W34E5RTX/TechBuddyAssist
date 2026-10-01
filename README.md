@@ -19,6 +19,16 @@ npm start
 
 The API serves the built frontend and listens on port `5000` by default.
 
+## Admin on Vercel
+
+The `/admin` page is available after deployment. In Vercel, open **Project Settings > Environment Variables** and set:
+
+- `ADMIN_PASSWORD`: the password used to sign in to the admin page. Keep it private and do not commit it.
+- `ADMIN_EMAIL`: the email address used with the admin password to sign in.
+- `JWT_SECRET`: a random secret with at least 32 characters. Generate one with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` and store it as a Vercel environment variable; do not commit it.
+
+Apply the variables to the Production environment, save them, then redeploy the project. The admin API deliberately refuses login when either variable is missing or invalid.
+
 ## React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

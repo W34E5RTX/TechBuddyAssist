@@ -68,6 +68,7 @@ const ensureSupportPlans = () => SupportPlan.bulkWrite(defaultSupportPlans.map((
 })))
 const missingAdminConfiguration = () => {
   const missing = []
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.ADMIN_EMAIL?.trim() || '')) missing.push('ADMIN_EMAIL (valid email address)')
   if (process.env.ADMIN_PASSWORD?.length < 12) missing.push('ADMIN_PASSWORD (at least 12 characters)')
   if (!adminSessionSecret || (process.env.NODE_ENV === 'production' &&
       (adminSessionSecret.length < 32 || adminSessionSecret === 'replace-with-a-long-random-secret'))) {
@@ -94,14 +95,17 @@ const requireAdmin = (req, res, next) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, database: isDatabaseReady() ? 'connected' : 'unavailable' }))
 app.post('/api/admin/login', adminLoginLimiter, (req, res) => {
+  const submittedEmail = String(req.body?.email || '').trim().toLowerCase()
+  const expectedEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase()
   const configuredPassword = process.env.ADMIN_PASSWORD
   if (!hasAdminConfiguration()) {
     return res.status(503).json({ message: `Admin is not configured. Set ${missingAdminConfiguration().join(' and ')} in the deployment environment.` })
   }
   const submittedPassword = Buffer.from(String(req.body?.password || ''))
   const expectedPassword = Buffer.from(configuredPassword)
-  if (submittedPassword.length !== expectedPassword.length || !crypto.timingSafeEqual(submittedPassword, expectedPassword)) {
-    return res.status(401).json({ message: 'The admin password is incorrect.' })
+  const passwordMatches = submittedPassword.length === expectedPassword.length && crypto.timingSafeEqual(submittedPassword, expectedPassword)
+  if (submittedEmail !== expectedEmail || !passwordMatches) {
+    return res.status(401).json({ message: 'The admin email or password is incorrect.' })
   }
   const token = jwt.sign({ role: 'admin' }, adminSessionSecret, { expiresIn: '8h' })
   res.cookie('admin_session', token, {
