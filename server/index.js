@@ -18,6 +18,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const app = express()
 const port = process.env.PORT || 5000
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === __filename
 const payments = []
 const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false })
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
@@ -30,13 +31,21 @@ const defaultSupportPlans = [
 ]
 
 app.use(helmet())
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
+app.use(cors({ origin: frontendUrl, credentials: true }))
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }))
 app.use(express.json({ limit: '20kb' }))
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }))
 app.use(express.static(path.join(__dirname, '../dist')))
 
-const validContact = (body) => body.name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) && body.phone && body.service && body.message?.length >= 10
+const validContact = (body) => {
+  const name = String(body?.name || '').trim()
+  const email = String(body?.email || '').trim().toLowerCase()
+  const phone = String(body?.phone || '').trim()
+  const service = String(body?.service || '').trim()
+  const message = String(body?.message || '').trim()
+
+  return name.length >= 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && phone.length >= 6 && service.length >= 2 && message.length >= 10
+}
 const contactSchema = new mongoose.Schema({ name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 }, email: { type: String, required: true, lowercase: true, trim: true }, phone: { type: String, required: true, trim: true }, service: { type: String, required: true, maxlength: 100 }, message: { type: String, required: true, maxlength: 1000 }, contactPreference: { type: String, enum: ['Email', 'Phone'], default: 'Email' }, status: { type: String, enum: ['New', 'In Progress', 'Resolved'], default: 'New' } }, { timestamps: true })
 const Contact = mongoose.model('Contact', contactSchema)
 const supportPlanSchema = new mongoose.Schema({
@@ -140,6 +149,39 @@ app.get('/api/support-plans', async (_req, res) => {
     res.json({ plans })
   } catch (error) {
     res.status(500).json({ message: 'Unable to load support plans.', error: error.message })
+  }
+})
+app.post('/api/checkout/support-plan', async (req, res) => {
+  if (!stripe) return res.status(503).json({ message: 'Online payments are temporarily unavailable.' })
+  if (!isDatabaseReady()) return res.status(503).json({ message: 'Support plans are temporarily unavailable.' })
+  const { planKey } = req.body || {}
+  if (typeof planKey !== 'string' || !planKey.trim() || planKey.length > 100) {
+    return res.status(400).json({ message: 'Choose a valid support plan.' })
+  }
+
+  try {
+    await ensureSupportPlans()
+    const plan = await SupportPlan.findOne({ key: planKey.trim(), isActive: { $ne: false } }).select('key name description amount').lean()
+    if (!plan) return res.status(404).json({ message: 'This support plan is unavailable. Please choose another plan.' })
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      managed_payments: { enabled: false },
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          unit_amount: plan.amount,
+          product_data: { name: plan.name, description: plan.description },
+        },
+        quantity: 1,
+      }],
+      success_url: `${frontendUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/billing/cancel`,
+      metadata: { planKey: plan.key, source: 'techbuddyassist-support-plan' },
+    })
+    res.json({ checkoutUrl: session.url })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to start checkout. Please try again.', error: error.message })
   }
 })
 app.get('/api/admin/support-plans', requireAdmin, async (_req, res) => {
@@ -271,10 +313,19 @@ app.post('/api/admin/custom-payments', requireAdmin, async (req, res) => {
   }
 })
 app.post('/api/contact', async (req, res) => {
-  if (!validContact(req.body)) return res.status(400).json({ message: 'Please provide valid contact details and a message of at least 10 characters.' })
+  const sanitizedBody = {
+    name: String(req.body?.name || '').trim(),
+    email: String(req.body?.email || '').trim().toLowerCase(),
+    phone: String(req.body?.phone || '').trim(),
+    service: String(req.body?.service || '').trim(),
+    message: String(req.body?.message || '').trim(),
+    contactPreference: req.body?.contactPreference,
+  }
+
+  if (!validContact(sanitizedBody)) return res.status(400).json({ message: 'Please provide valid contact details and a message of at least 10 characters.' })
   if (!isDatabaseReady()) return res.status(503).json({ message: 'Database is unavailable. Please try again.' })
   try {
-    const record = await Contact.create(req.body)
+    const record = await Contact.create(sanitizedBody)
     res.status(201).json({ message: 'Support request received', contact: record })
   } catch (error) {
     res.status(500).json({ message: 'Unable to save support request data', error: error.message })
@@ -333,6 +384,6 @@ const start = () => {
   app.listen(port, () => console.log(`Techbuddyassist API listening on ${port}`))
   connectDatabase().catch((error) => console.error(`Database unavailable; API is running without database-backed features: ${error.message}`))
 }
-if (!process.env.VERCEL) start()
+if (isDirectRun && !process.env.VERCEL) start()
 
-export { app }
+export { app, start }

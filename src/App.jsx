@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, BadgeCheck, Check, ChevronDown, CircleHelp, Clock3, Cloud, Cpu, Headphones, Laptop, Menu, MessageCircle, Network, Phone, ShieldCheck, Smartphone, Sparkles, TabletSmartphone, Wifi, X } from 'lucide-react'
 import './App.css'
@@ -53,26 +53,30 @@ function LogoWordmark({ compact = false }) {
   )
 }
 
-function Nav({ menuOpen, setMenuOpen, scrollTo }) {
+function Nav({ menuOpen, setMenuOpen }) {
+  const { pathname } = useLocation()
+  const closeMenu = () => setMenuOpen(false)
+
   return (
     <header className="nav-wrap">
       <nav className="nav container" aria-label="Main navigation">
-        <button className="brand" onClick={() => scrollTo('home')}>
+        <Link className="brand" to="/" onClick={closeMenu} aria-label="Techbuddyassist home">
           <LogoWordmark />
-        </button>
+        </Link>
         <button className="menu-toggle" aria-label="Toggle navigation" onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? <X /> : <Menu />}
         </button>
         <div className={`nav-links ${menuOpen ? 'is-open' : ''}`}>
-          <button onClick={() => scrollTo('home')}>Home</button>
-          <button onClick={() => scrollTo('services')}>Services</button>
-          <button onClick={() => scrollTo('how-it-works')}>How It Works</button>
-          <button onClick={() => scrollTo('about')}>About</button>
-          <button onClick={() => scrollTo('faq')}>FAQ</button>
-          <button onClick={() => scrollTo('contact')}>Contact</button>
-          <button className="button button-small" onClick={() => scrollTo('contact')}>
+          <Link to="/" onClick={closeMenu} aria-current={pathname === '/' ? 'page' : undefined}>Home</Link>
+          <Link to="/services" onClick={closeMenu} aria-current={pathname === '/services' ? 'page' : undefined}>Services</Link>
+          <Link to="/how-it-works" onClick={closeMenu} aria-current={pathname === '/how-it-works' ? 'page' : undefined}>How It Works</Link>
+          <Link to="/about" onClick={closeMenu} aria-current={pathname === '/about' ? 'page' : undefined}>About</Link>
+          <Link to="/faq" onClick={closeMenu} aria-current={pathname === '/faq' ? 'page' : undefined}>FAQ</Link>
+          <Link to="/contact" onClick={closeMenu} aria-current={pathname === '/contact' ? 'page' : undefined}>Contact</Link>
+          <Link to="/billing" onClick={closeMenu} aria-current={pathname === '/billing' ? 'page' : undefined}>Payment</Link>
+          <Link className="button button-small" to="/contact" onClick={closeMenu}>
             Get Support <ArrowRight size={15} />
-          </button>
+          </Link>
         </div>
       </nav>
     </header>
@@ -84,7 +88,7 @@ function FooterLinkGroup({ title, links }) {
     <div>
       <span className="footer-label">{title}</span>
       {links.map((link) => (
-        <a key={link.label} href={link.href}>{link.label}</a>
+        <Link key={link.label} to={link.href}>{link.label}</Link>
       ))}
     </div>
   )
@@ -92,6 +96,8 @@ function FooterLinkGroup({ title, links }) {
 
 function BillingPage() {
   const [plans, setPlans] = useState(defaultSupportPlans)
+  const [pendingPlanKey, setPendingPlanKey] = useState('')
+  const [checkoutError, setCheckoutError] = useState('')
 
   useEffect(() => {
     fetch('/api/support-plans')
@@ -102,14 +108,34 @@ function BillingPage() {
       .catch(() => undefined)
   }, [])
 
+  const startCheckout = async (planKey) => {
+    setPendingPlanKey(planKey)
+    setCheckoutError('')
+    try {
+      const response = await fetch('/api/checkout/support-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planKey }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.message || 'Unable to start checkout. Please try again.')
+      if (!data.checkoutUrl) throw new Error('Checkout link was not returned. Please try again.')
+      window.location.assign(data.checkoutUrl)
+    } catch (error) {
+      setCheckoutError(error.message || 'Unable to start checkout. Please try again.')
+      setPendingPlanKey('')
+    }
+  }
+
   return (
     <section id="billing" className="section billing-section">
       <div className="container">
         <div className="section-heading billing-heading">
           <span className="eyebrow">Support options</span>
           <h2>Choose your <em>support plan.</em></h2>
-          <p>Starting prices for common support needs. We’ll confirm the scope and final price with you before work begins.</p>
+          <p>Choose a plan to continue to secure payment.</p>
         </div>
+        {checkoutError && <p className="error-message" role="alert">{checkoutError}</p>}
         <div className="pricing-grid">
           {plans.map((plan, index) => {
             const isFeatured = index === 1
@@ -119,14 +145,14 @@ function BillingPage() {
               <span className="pricing-tag">{plan.category}</span>
               <h3>{plan.name}</h3>
               <div className="price-line">
-                <strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(plan.amount / 100)}</strong>
-                <span>starting at</span>
+                <strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(plan.amount / 100)}</strong>
+                <span>one-time</span>
               </div>
               <p>{plan.description}</p>
               <div className="pricing-feature"><Check size={17} /><span>{plan.feature}</span></div>
-              <a className={`plan-button ${isFeatured ? 'button' : 'outline-button'}`} href="/#contact">
-                Request a quote <ArrowRight size={17} />
-              </a>
+              <button className={`plan-button ${isFeatured ? 'button' : 'outline-button'}`} type="button" onClick={() => startCheckout(plan.key)} disabled={Boolean(pendingPlanKey)}>
+                {pendingPlanKey === plan.key ? 'Opening checkout…' : 'Pay now'} <ArrowRight size={17} />
+              </button>
             </article>
             )
           })}
@@ -140,39 +166,39 @@ function BillingPage() {
   )
 }
 
-function Footer({ scrollTo }) {
+function Footer() {
   const navigationLinks = [
-    { label: 'Home', href: '#home' },
-    { label: 'Services', href: '#services' },
-    { label: 'How It Works', href: '#how-it-works' },
-    { label: 'About Us', href: '#about' },
-    { label: 'FAQ', href: '#faq' },
-    { label: 'Contact Us', href: '#contact' },
-    { label: 'Payment', href: '#contact' },
+    { label: 'Home', href: '/' },
+    { label: 'Services', href: '/services' },
+    { label: 'How It Works', href: '/how-it-works' },
+    { label: 'About Us', href: '/about' },
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Contact Us', href: '/contact' },
+    { label: 'Payment', href: '/billing' },
   ]
 
   const serviceLinks = [
-    { label: 'Computer Support', href: '#services' },
-    { label: 'Windows & Mac', href: '#services' },
-    { label: 'Smartphone & Tablet', href: '#services' },
-    { label: 'Wi-Fi & Network', href: '#services' },
-    { label: 'Remote Support', href: '#services' },
-    { label: 'Small Business IT', href: '#business' },
+    { label: 'Computer Support', href: '/services' },
+    { label: 'Windows & Mac', href: '/services' },
+    { label: 'Smartphone & Tablet', href: '/services' },
+    { label: 'Wi-Fi & Network', href: '/services' },
+    { label: 'Remote Support', href: '/services' },
+    { label: 'Small Business IT', href: '/services' },
   ]
 
   const legalLinks = [
-    { label: 'Privacy Policy', href: '#contact' },
-    { label: 'Terms of Service', href: '#contact' },
-    { label: 'Refund Policy', href: '#contact' },
+    { label: 'Privacy Policy', href: '/privacy' },
+    { label: 'Terms of Service', href: '/contact' },
+    { label: 'Refund Policy', href: '/contact' },
   ]
 
   return (
     <footer className="footer">
       <div className="container footer-grid">
         <div>
-          <button className="brand footer-brand" onClick={() => scrollTo('home')}>
+          <Link className="brand footer-brand" to="/">
             <LogoWordmark compact />
-          </button>
+          </Link>
           <p>Simple, reliable technology support for real life.</p>
           <address className="footer-contact">
             1901 N. Roselle Rd, Suite 800<br />
@@ -194,6 +220,7 @@ function Footer({ scrollTo }) {
 
 function LandingPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [openFaq, setOpenFaq] = useState(null)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
@@ -206,9 +233,32 @@ function LandingPage() {
   ]
 
   const scrollTo = (id) => {
+    const routes = {
+      home: '/',
+      services: '/services',
+      'how-it-works': '/how-it-works',
+      about: '/about',
+      faq: '/faq',
+      contact: '/contact',
+      business: '/services',
+      billing: '/billing',
+    }
+    const targetRoute = routes[id]
+    if (location.pathname !== '/' && targetRoute && location.pathname !== targetRoute) {
+      navigate(targetRoute)
+      return
+    }
+    if (id === 'home' && location.pathname !== '/') {
+      navigate('/')
+      return
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
     setMenuOpen(false)
   }
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
 
   const submitForm = async (event) => {
     event.preventDefault(); setFormState('loading'); setFormError('')
@@ -236,10 +286,18 @@ function LandingPage() {
     }
   }
 
+  const pageClass = {
+    '/services': 'page-services',
+    '/how-it-works': 'page-how-it-works',
+    '/about': 'page-about',
+    '/faq': 'page-faq',
+    '/contact': 'page-contact',
+  }[location.pathname] || ''
+
   return (
-    <div className="site-shell">
+    <div className={`site-shell ${pageClass}`}>
       <div className="announcement"><span>New</span> Patient, professional technology support is one message away. <button onClick={() => scrollTo('contact')}>Get help today <ArrowRight size={14} /></button></div>
-      <Nav menuOpen={menuOpen} setMenuOpen={setMenuOpen} scrollTo={scrollTo} />
+      <Nav menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <main>
         <section id="home" className="hero">
           <div className="hero-glow" />
@@ -467,7 +525,7 @@ function LandingPage() {
           </div>
         </section>
 
-        <BillingPage />
+        {location.pathname === '/' && <BillingPage />}
 
         <section id="faq" className="section faq-section">
           <div className="container faq-grid">
@@ -536,7 +594,7 @@ function LandingPage() {
           </div>
         </section>
       </main>
-      <Footer scrollTo={scrollTo} />
+      <Footer />
     </div>
   )
 }
@@ -568,20 +626,62 @@ function StripeStatusPage({ status }) {
   )
 }
 
-function BillingPageRoute() {
-  const navigate = useNavigate()
+function PrivacyPolicyPage() {
+  return (
+    <div className="site-shell privacy-shell">
+      <header className="privacy-header">
+        <div className="container">
+          <Link className="brand" to="/" aria-label="Techbuddyassist home">
+            <LogoWordmark compact />
+          </Link>
+          <Link className="privacy-home-link" to="/">Back to home</Link>
+        </div>
+      </header>
+      <main className="privacy-main">
+        <article className="privacy-content">
+          <span className="eyebrow">Techbuddyassist</span>
+          <h1>Privacy Policy</h1>
+          <p className="privacy-updated">Effective October 13, 2026</p>
+          <p>We respect your privacy. This policy explains what information Techbuddyassist collects when you use our website and how we use it.</p>
 
+          <h2>Information you provide</h2>
+          <p>When you submit a support request, we collect the information in the form, such as your name, email address, phone number, requested service, and description of your issue.</p>
+
+          <h2>How we use your information</h2>
+          <p>We use your information to respond to support requests, communicate with you about the help you need, and provide and manage our services.</p>
+
+          <h2>Payments</h2>
+          <p>If you choose a paid support plan, payment is handled through our payment provider, Stripe. Payment details are submitted directly to Stripe and are subject to its privacy policy. We receive information needed to manage your order and payment.</p>
+
+          <h2>Service providers</h2>
+          <p>We use service providers to operate our website, store support requests, and process payments. We share information with them only as needed to provide those services. We do not sell your personal information.</p>
+
+          <h2>Retention and security</h2>
+          <p>We keep information for as long as needed to respond to and manage support requests, meet applicable legal obligations, and resolve disputes. We use reasonable safeguards to help protect the information we handle.</p>
+
+          <h2>Your choices and questions</h2>
+          <p>You can contact us to ask about, correct, or request deletion of information you have provided, subject to applicable requirements. Use our <Link to="/contact">contact page</Link> or call <a href="tel:+17082311796">+1 (708) 231-1796</a> for privacy questions.</p>
+
+          <h2>Updates to this policy</h2>
+          <p>We may update this policy from time to time. Any changes will be posted on this page with an updated effective date.</p>
+        </article>
+      </main>
+    </div>
+  )
+}
+
+function BillingPageRoute() {
   return (
     <div className="site-shell">
       <div className="announcement"><span>Quotes</span> We confirm scope and pricing before work begins.</div>
       <header className="nav-wrap">
         <nav className="nav container" aria-label="Billing navigation">
-          <button className="brand" onClick={() => navigate('/')}>
-            <span className="brand-wordmark"><span className="brand-tech">Tech</span><span className="brand-buddy">Buddy</span><span className="brand-assist">Assist</span></span>
-          </button>
+          <Link className="brand" to="/">
+            <LogoWordmark />
+          </Link>
           <div className="billing-nav-actions">
             <Link to="/admin" className="text-button">Admin</Link>
-            <button className="outline-button" onClick={() => navigate('/')}>Back home</button>
+            <Link to="/" className="outline-button">Back home</Link>
           </div>
         </nav>
       </header>
@@ -918,6 +1018,12 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/services" element={<LandingPage />} />
+        <Route path="/how-it-works" element={<LandingPage />} />
+        <Route path="/about" element={<LandingPage />} />
+        <Route path="/faq" element={<LandingPage />} />
+        <Route path="/contact" element={<LandingPage />} />
         <Route path="/billing" element={<BillingPageRoute />} />
         <Route path="/billing/admin" element={<Navigate to="/admin" replace />} />
         <Route path="/admin" element={<AdminPage />} />
