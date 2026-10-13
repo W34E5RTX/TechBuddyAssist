@@ -25,7 +25,7 @@ const faqs = [
   ['How does remote support work?', 'Start with the form below. We review what is happening, explain the next step, and schedule remote assistance when suitable.'],
   ['How much does support cost?', 'Contact us for a tailored quote. We explain the scope clearly before any work begins.'],
   ['Is my information secure?', 'We treat your details as confidential and only use them to respond to your support request.'],
-  ['How can I contact support?', 'Use the support form or call the number in the footer. Your request will be saved securely in our Neon database.'],
+  ['How can I contact support?', 'Use the support form or call the number in the footer. We use the details you provide to respond to your request.'],
 ]
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6 } } }
@@ -188,8 +188,9 @@ function Footer() {
 
   const legalLinks = [
     { label: 'Privacy Policy', href: '/privacy' },
-    { label: 'Terms of Service', href: '/contact' },
-    { label: 'Refund Policy', href: '/contact' },
+    { label: 'Terms of Service', href: '/terms' },
+    { label: 'Disclaimer', href: '/disclaimer' },
+    { label: 'Refund Policy', href: '/refund-policy' },
   ]
 
   return (
@@ -626,47 +627,154 @@ function StripeStatusPage({ status }) {
   )
 }
 
-function PrivacyPolicyPage() {
+function LegalPageLayout({ title, children }) {
   return (
-    <div className="site-shell privacy-shell">
-      <header className="privacy-header">
+    <div className="site-shell legal-shell">
+      <header className="legal-header">
         <div className="container">
           <Link className="brand" to="/" aria-label="Techbuddyassist home">
             <LogoWordmark compact />
           </Link>
-          <Link className="privacy-home-link" to="/">Back to home</Link>
+          <Link className="legal-home-link" to="/">Back to home</Link>
         </div>
       </header>
-      <main className="privacy-main">
-        <article className="privacy-content">
+      <main className="legal-main">
+        <article className="legal-content">
           <span className="eyebrow">Techbuddyassist</span>
-          <h1>Privacy Policy</h1>
-          <p className="privacy-updated">Effective October 13, 2026</p>
-          <p>We respect your privacy. This policy explains what information Techbuddyassist collects when you use our website and how we use it.</p>
-
-          <h2>Information you provide</h2>
-          <p>When you submit a support request, we collect the information in the form, such as your name, email address, phone number, requested service, and description of your issue.</p>
-
-          <h2>How we use your information</h2>
-          <p>We use your information to respond to support requests, communicate with you about the help you need, and provide and manage our services.</p>
-
-          <h2>Payments</h2>
-          <p>If you choose a paid support plan, payment is handled through our payment provider, Stripe. Payment details are submitted directly to Stripe and are subject to its privacy policy. We receive information needed to manage your order and payment.</p>
-
-          <h2>Service providers</h2>
-          <p>We use service providers to operate our website, store support requests, and process payments. We share information with them only as needed to provide those services. We do not sell your personal information.</p>
-
-          <h2>Retention and security</h2>
-          <p>We keep information for as long as needed to respond to and manage support requests, meet applicable legal obligations, and resolve disputes. We use reasonable safeguards to help protect the information we handle.</p>
-
-          <h2>Your choices and questions</h2>
-          <p>You can contact us to ask about, correct, or request deletion of information you have provided, subject to applicable requirements. Use our <Link to="/contact">contact page</Link> or call <a href="tel:+17082311796">+1 (708) 231-1796</a> for privacy questions.</p>
-
-          <h2>Updates to this policy</h2>
-          <p>We may update this policy from time to time. Any changes will be posted on this page with an updated effective date.</p>
+          <h1>{title}</h1>
+          <p className="legal-updated">Effective October 13, 2026</p>
+          {children}
+          <nav className="legal-related-links" aria-label="Other legal pages">
+            <a href="https://techbuddyassist.com/privacy">Privacy Policy</a>
+            <a href="https://techbuddyassist.com/terms">Terms of Service</a>
+            <a href="https://techbuddyassist.com/disclaimer">Disclaimer</a>
+            <a href="https://techbuddyassist.com/refund-policy">Refund Policy</a>
+          </nav>
         </article>
       </main>
     </div>
+  )
+}
+
+function PrivacyPolicyPage() {
+  return (
+    <LegalPageLayout title="Privacy Policy">
+      <p>This policy describes how Techbuddyassist collects, uses, and shares information when you visit this website, request support, or make a payment. We do not sell personal information.</p>
+
+      <h2>Information you provide</h2>
+      <p>The support form asks for your name, email address, phone number, selected service, and a description of your issue. If you ask for support or provide payment details through a separate checkout, we also process information needed to respond and manage that request or payment.</p>
+
+      <h2>How we use information</h2>
+      <p>We use submitted information to respond to you, understand and deliver requested support, arrange or administer payments, maintain our records, protect the website, and meet legal obligations.</p>
+
+      <h2>Storage and service providers</h2>
+      <p>Support requests and related records are stored in a MongoDB database used by the website. Website hosting, database, and payment services are provided by third parties that process information on our behalf or under their own terms. We use Stripe-hosted checkout for payments; Stripe collects and processes payment details under its own privacy policy. We do not store full payment card numbers on this website.</p>
+
+      <h2>Cookies and external services</h2>
+      <p>When an administrator signs in, the site uses an essential, HTTP-only session cookie to maintain that restricted session. The cookie is limited to the API and expires after eight hours. The website also loads fonts from Google Fonts; when those fonts load, Google may receive technical information such as your IP address and browser details. We have not added advertising or analytics cookies to the website code.</p>
+
+      <h2>Retention and security</h2>
+      <p>We keep information for as long as reasonably needed to respond to requests, administer services and payments, meet legal requirements, and resolve disputes. Support requests currently have no automatic deletion schedule and may remain in the database until removed. We use access controls and other safeguards, but no internet transmission or storage system can be guaranteed completely secure.</p>
+
+      <h2>Your choices</h2>
+      <h2>Support communications and remote access</h2>
+      <p>We use the contact details and issue description you submit to respond to and manage your support request. Support requests are stored in our MongoDB database and are accessible to authorized administrators for handling requests. If remote assistance is offered, access is not initiated through the contact form; it requires your permission for the session. You control whether to grant access and may end the session. Do not send passwords, payment-card details, or one-time security codes through the website.</p>
+
+      <h2>Your choices</h2>
+      <p>You may contact us to ask about, correct, or request deletion of information you provided. We may need to verify your request and may retain information where required or permitted by law. To make a request, use our <a href="https://techbuddyassist.com/contact">Contact Us page</a> or call <a href="tel:+17082311796">+1 (708) 231-1796</a>.</p>
+
+      <h2>Children and changes</h2>
+      <p>This website is intended for a general audience and is not directed to children under 13. We do not knowingly request personal information from children under 13. We may update this policy; the effective date above will show when it was last revised.</p>
+
+      <h2>Contact</h2>
+      <p>Techbuddyassist, 1901 N. Roselle Rd, Suite 800, Schaumburg, Illinois 60195. You may also call <a href="tel:+17082311796">+1 (708) 231-1796</a>.</p>
+    </LegalPageLayout>
+  )
+}
+
+function TermsOfServicePage() {
+  return (
+    <LegalPageLayout title="Terms of Service">
+      <p>These terms apply when you use the TechBuddy Assist website, submit a support request, or purchase a support plan. By using the website, you agree to these terms. If you do not agree, do not use the website. Our <a href="https://techbuddyassist.com/privacy">Privacy Policy</a> explains how we handle support requests and personal information.</p>
+
+      <h2>Our services</h2>
+      <p>Techbuddyassist provides technology support and guidance for common computer, mobile-device, software, connectivity, setup, and small-business technology needs. Website descriptions are general summaries. The exact work, timing, and deliverables will depend on the issue and any scope confirmed with you.</p>
+      <p>Submitting a support form is a request, not a confirmed appointment or promise that a particular service is available. We use the contact details and issue description you provide to respond and coordinate the request. Any custom quote must be agreed before the quoted work begins.</p>
+
+      <h2>Your responsibilities</h2>
+      <p>Provide accurate information and only request help for devices, accounts, and systems you own or are authorized to manage. Before troubleshooting, maintain a separate backup of important files and follow any instructions about access, permissions, or equipment. Do not use our services to violate law, access another person’s system without permission, or interfere with security controls.</p>
+
+      <h2>Remote support</h2>
+      <p>Remote access is used only when appropriate and with your permission for the session. The support form does not itself grant device access. You decide whether to grant access and may end the session. Do not share passwords, payment-card details, or one-time security codes in the support form or chat. See our <a href="https://techbuddyassist.com/privacy">Privacy Policy</a> for information about handling support requests and contact details.</p>
+
+      <h2>Prices and payment</h2>
+      <p>Prices shown on the payment page are one-time amounts in U.S. dollars for the plan descriptions displayed there. Custom work may have a separate quote. Payment checkout is provided by Stripe and is subject to Stripe’s terms. A checkout canceled before payment is completed is not a completed purchase.</p>
+      <p>Refund eligibility and cancellation rules are described in our <a href="https://techbuddyassist.com/refund-policy">Refund Policy</a>. Nothing in that policy or these terms removes rights that cannot legally be waived.</p>
+
+      <h2>Availability and third parties</h2>
+      <p>We may update, suspend, or discontinue website features. The site also relies on third-party services, including hosting, database, font, and payment providers; their services are governed by their own terms and availability.</p>
+
+      <h2>Website content</h2>
+      <p>Website text, design, and branding belong to Techbuddyassist or their respective owners. You may use the website for personal or internal business purposes, but may not copy or republish site content commercially without permission.</p>
+
+      <h2>Disclaimers and liability</h2>
+      <p>Technology support is provided on a best-efforts basis. We do not guarantee that every issue can be diagnosed or resolved, or that the website will always be available. Read the <a href="https://techbuddyassist.com/disclaimer">Disclaimer</a> for important information about technical guidance, data backups, and outcomes.</p>
+      <p>Nothing in these terms excludes or limits liability, consumer protections, or other rights where doing so is not permitted by applicable law. Any limitation applies only to the extent the law permits it. These terms have not been reviewed for every jurisdiction; seek independent advice if you need help understanding your rights.</p>
+
+      <h2>Changes and contact</h2>
+      <p>We may update these terms by posting a revised version here. The effective date above indicates when the current version takes effect. Questions may be sent through the <a href="https://techbuddyassist.com/contact">Contact Us page</a> or by calling <a href="tel:+17082311796">+1 (708) 231-1796</a>.</p>
+      <p>TechBuddy Assist, 1901 N. Roselle Rd, Suite 800, Schaumburg, Illinois 60195.</p>
+    </LegalPageLayout>
+  )
+}
+
+function RefundPolicyPage() {
+  return (
+    <LegalPageLayout title="Refund Policy">
+      <p>This policy applies to one-time support-plan purchases made through TechBuddy Assist’s Stripe-hosted checkout. It is effective October 13, 2026.</p>
+
+      <h2>When you may cancel</h2>
+      <p>You may cancel a support purchase and request a full refund any time before support work begins. Contact us through the <a href="https://techbuddyassist.com/contact">Contact Us page</a> or call <a href="tel:+17082311796">+1 (708) 231-1796</a>. Include the name and email used for the purchase and any receipt or payment reference so we can identify it. If a checkout is canceled before payment is completed, no payment is taken.</p>
+
+      <h2>After support begins</h2>
+      <p>Once support work has started, payments are not refundable under this policy. This does not limit any refund, cancellation, or other rights that apply under mandatory law. If you believe a payment was made in error or have a concern about the service, contact us so we can review it.</p>
+
+      <h2>How refunds are processed</h2>
+      <p>For an eligible request, we will review the request and, when approved, submit the full refund to the original payment method within five business days. Your bank or card issuer controls when the credit appears, so the time for it to post may vary.</p>
+
+      <h2>Custom quotes and questions</h2>
+      <p>For custom work, any cancellation or refund terms specifically agreed in writing for that work will apply, subject to applicable law. If no separate written terms were agreed, contact us before work begins to request cancellation and a full refund. Questions about this policy may be sent through the <a href="https://techbuddyassist.com/contact">Contact Us page</a>.</p>
+
+      <h2>Contact</h2>
+      <p>TechBuddy Assist, 1901 N. Roselle Rd, Suite 800, Schaumburg, Illinois 60195. Phone: <a href="tel:+17082311796">+1 (708) 231-1796</a>.</p>
+    </LegalPageLayout>
+  )
+}
+
+function DisclaimerPage() {
+  return (
+    <LegalPageLayout title="Disclaimer">
+      <p>This Disclaimer applies to information on the Techbuddyassist website and to general technology guidance provided through our services.</p>
+
+      <h2>Guidance and outcomes</h2>
+      <p>Website content and support guidance are general information based on the details available at the time. Technology, software, and device configurations vary. We cannot guarantee that a suggested step will resolve a particular issue or that a device, network, account, or application will remain error-free.</p>
+
+      <h2>Protect your data and access</h2>
+      <p>Back up important files before making system changes, installing software, changing settings, or beginning troubleshooting. You are responsible for keeping a current backup and for deciding whether to proceed with a recommended step. Do not send passwords, full payment-card numbers, or security codes through the website.</p>
+      <p>Remote assistance, when offered, requires your permission. You remain in control of the device and may stop the session. We do not guarantee recovery of lost data or prevention of every security incident.</p>
+
+      <h2>Third-party products and services</h2>
+      <p>References to third-party devices, software, providers, or services are for identification and do not mean that those parties endorse Techbuddyassist. Their products and services remain subject to their own warranties, terms, and support policies. Contact the manufacturer or provider when an issue may affect a warranty, account, or service agreement.</p>
+
+      <h2>No emergency service</h2>
+      <p>Techbuddyassist is not an emergency-response provider and does not monitor support requests continuously. Do not rely on this website for urgent safety, medical, or active cyber-incident response. Contact the appropriate emergency service, provider, or qualified incident-response professional when needed.</p>
+
+      <h2>Limits</h2>
+      <p>The website and its content are provided as available, without a promise that they will be uninterrupted, error-free, or suitable for every purpose. Any exclusion or limitation of liability applies only to the extent permitted by applicable law. Nothing in this Disclaimer excludes or limits liability, consumer protections, or other rights that cannot legally be excluded or limited.</p>
+
+      <h2>Contact</h2>
+      <p>If you have questions about this Disclaimer, please contact TechBuddy Assist through our <a href="https://techbuddyassist.com/contact">Contact Us page</a> or call <a href="tel:+17082311796">+1 (708) 231-1796</a>.</p>
+    </LegalPageLayout>
   )
 }
 
@@ -1019,6 +1127,9 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsOfServicePage />} />
+        <Route path="/disclaimer" element={<DisclaimerPage />} />
+        <Route path="/refund-policy" element={<RefundPolicyPage />} />
         <Route path="/services" element={<LandingPage />} />
         <Route path="/how-it-works" element={<LandingPage />} />
         <Route path="/about" element={<LandingPage />} />
